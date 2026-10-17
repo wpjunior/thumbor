@@ -137,7 +137,7 @@ class Context:  # pylint: disable=too-many-instance-attributes
     # codebase, at the cost of the two suppressions in __init__.
     server: ServerParameters
     config: Config
-    modules: ContextImporter | None
+    modules: ContextImporter
     metrics: BaseMetrics
     request_handler: RequestHandler | None
     request: RequestParameters
@@ -160,12 +160,12 @@ class Context:  # pylint: disable=too-many-instance-attributes
             self.modules = ContextImporter(self, importer)
 
             if importer.metrics:
-                self.metrics = importer.metrics(config)
+                self.metrics = importer.metrics(self.config)
             else:
-                self.metrics = Metrics(config)
+                self.metrics = Metrics(self.config)
         else:
-            self.modules = None
-            self.metrics = Metrics(config)
+            self.modules = None  # ty: ignore[invalid-assignment]
+            self.metrics = Metrics(self.config)
 
         self.app_class = "thumbor.app.ThumborServiceApp"
 

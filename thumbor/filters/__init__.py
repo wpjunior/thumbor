@@ -7,10 +7,17 @@
 # http://www.opensource.org/licenses/mit-license
 # Copyright (c) 2011 globo.com thumbor@googlegroups.com
 
+from __future__ import annotations
+
 import collections
 import functools
 import re
 import time
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Iterable, Pattern
+
+if TYPE_CHECKING:
+    from thumbor.context import Context
+    from thumbor.engines import BaseEngine
 
 BUILTIN_FILTERS = [
     "thumbor.filters.brightness",
@@ -51,8 +58,10 @@ PHASE_PRE_LOAD = "pre-load"
 PHASE_AFTER_LOAD = "after-load"
 
 
-def filter_method(*args):
-    def _filter_deco(filtered_function):
+def filter_method(*args: Any) -> Callable[..., Any]:
+    def _filter_deco(
+        filtered_function: Callable[..., Any],
+    ) -> Callable[..., Any]:
         @functools.wraps(filtered_function)
         async def wrapper(self, *args2):
             return await filtered_function(self, *args2)
@@ -79,15 +88,19 @@ def filter_method(*args):
 
 
 class FiltersFactory:
-    def __init__(self, filter_classes):
-        self.filter_classes_map = {}
+    def __init__(self, filter_classes: Iterable[type[BaseFilter]]) -> None:
+        self.filter_classes_map: dict[str | None, type[BaseFilter]] = {}
 
         for cls in filter_classes:
             filter_name = cls.pre_compile()
             self.filter_classes_map[filter_name] = cls
 
-    def create_instances(self, context, filter_params):
-        filter_instances = collections.defaultdict(list)
+    def create_instances(
+        self, context: Context, filter_params: str | None
+    ) -> FiltersRunner:
+        filter_instances: dict[str, list[BaseFilter]] = (
+            collections.defaultdict(list)
+        )
         if not filter_params:
             return FiltersRunner(filter_instances)
 
@@ -114,10 +127,10 @@ class FiltersFactory:
 
 
 class FiltersRunner:
-    def __init__(self, filter_instances):
+    def __init__(self, filter_instances: dict[str, list[BaseFilter]]) -> None:
         self.filter_instances = filter_instances
 
-    async def apply_filters(self, phase):
+    async def apply_filters(self, phase: str) -> None:
         filters = self.filter_instances.get(phase, None)
         if not filters:
             return None
@@ -148,8 +161,24 @@ class BaseFilter:
         "parse": lambda v: STRIP_QUOTE.sub(r"\1", v),
     }
 
+    # Set on the subclass by pre_compile/compile_regex, which FiltersFactory
+    # runs for every registered filter class.
+    runnable_method: Callable[..., Awaitable[Any]]
+    parsers: list[Callable[[str], Any] | None]
+    regex_str: str
+    regex: Pattern[str] | None
+    phase: str
+
+    params: list[Any] | None
+    # Only FiltersFactory builds filters, and it always passes a context;
+    # the None default is for direct construction in tests.
+    context: Context
+    # run() assigns None here when the context has no engine, so this one
+    # really can be None. See the open findings in docs/typing.md.
+    engine: BaseEngine | None
+
     @classmethod
-    def pre_compile(cls):
+    def pre_compile(cls) -> str | None:
         meths = [
             f for f in list(cls.__dict__.values()) if hasattr(f, "filter_data")
         ]
@@ -162,7 +191,7 @@ class BaseFilter:
         return filter_data["name"]
 
     @classmethod
-    def compile_regex(cls, filter_data):
+    def compile_regex(cls, filter_data: dict[str, Any]) -> None:
         params = filter_data["params"]
         defaults = filter_data.get("defaults", None)
         regexes = []
@@ -186,27 +215,29 @@ class BaseFilter:
         cls.regex = re.compile(cls.regex_str)
 
     @classmethod
-    def init_if_valid(cls, param, context):
+    def init_if_valid(cls, param: str, context: Context) -> BaseFilter | None:
         instance = cls(param, context)
         if instance.params is not None:
             return instance
         return None
 
-    def __init__(self, params, context=None):
-        params = self.regex.match(params) if self.regex else None
-        if params:
-            params = [
+    def __init__(self, params: str, context: Context | None = None) -> None:
+        matched = self.regex.match(params) if self.regex else None
+        self.params = (
+            [
                 parser(param) if parser else param
-                for parser, param in zip(self.parsers, params.groups())
+                for parser, param in zip(self.parsers, matched.groups())
                 if param
             ]
-        self.params = params
-        self.context = context
+            if matched
+            else None
+        )
+        self.context = context  # ty: ignore[invalid-assignment]
         self.engine = (
             context.modules.engine if context and context.modules else None
         )
 
-    async def run(self):
+    async def run(self) -> list[Any] | None:
         if self.params is None:
             return
 

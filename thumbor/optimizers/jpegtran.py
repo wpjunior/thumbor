@@ -7,6 +7,8 @@
 # http://www.opensource.org/licenses/mit-license
 # Copyright (c) 2011 globo.com thumbor@googlegroups.com
 
+from __future__ import annotations
+
 from os.path import exists
 from subprocess import PIPE, Popen
 
@@ -15,7 +17,7 @@ from thumbor.utils import logger
 
 
 class Optimizer(BaseOptimizer):
-    def should_run(self, image_extension, image_buffer):
+    def should_run(self, image_extension: str, image_buffer: bytes) -> bool:
         if image_extension in [".jpg", ".jpeg"]:
             if self.context.config.JPEGTRAN_PATH is None or not exists(
                 self.context.config.JPEGTRAN_PATH
@@ -27,7 +29,7 @@ class Optimizer(BaseOptimizer):
             return True
         return False
 
-    def run_optimizer(self, image_extension, buffer):
+    def run_optimizer(self, image_extension: str, buffer: bytes) -> bytes:
         if not self.should_run(image_extension, buffer):
             return buffer
 

@@ -12,8 +12,8 @@ from thumbor.utils import logger
 
 
 class Metrics(BaseMetrics):
-    def incr(self, metricname, value=1):
+    def incr(self, metricname: str, value: int = 1) -> None:
         logger.debug("METRICS: inc: %s:%d", metricname, value)
 
-    def timing(self, metricname, value):
+    def timing(self, metricname: str, value: float) -> None:
         logger.debug("METRICS: timing: %s:%d", metricname, value)

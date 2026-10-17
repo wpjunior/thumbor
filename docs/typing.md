@@ -24,10 +24,11 @@ the package itself is clean.
 
 ## Where the diagnostics come from
 
-The count started at **419** (ty 0.0.89, `thumbor/` only) and is **375**
-after phase 1. The number moves slowly on purpose: annotating a module
-often *reveals* errors that were previously hidden behind `Unknown`, so a
-phase can fix real problems without the total dropping much.
+The count started at **419** (ty 0.0.89, `thumbor/` only), was **375**
+after phase 1 and is **369** after phase 2. The number moves slowly on
+purpose: annotating a module often *reveals* errors that were previously
+hidden behind `Unknown`, so a phase can fix real problems while the total
+barely moves — or rises.
 
 Almost all of it is one shape. `Context`, `ContextImporter`, `BaseFilter`
 and `BaseEngine` each initialise their collaborators to `None`, so ty infers
@@ -36,9 +37,11 @@ and `BaseEngine` each initialise their collaborators to `None`, so ty infers
 and the errors only clear when a link is annotated — fixing `Context` alone
 moved the total by 25.
 
-That is why the biggest numeric wins are in phases 2 and 5, not here:
-`BaseFilter.context` feeds the 32 filters and `BaseHandler.context` feeds
-the handlers, which together hold most of the remaining diagnostics.
+**82 of the 369 are a single problem**: the reachable `None` on
+`BaseFilter.engine` (see the open findings below). Annotating `engine`
+honestly as `BaseEngine | None` is what makes them visible — they were
+there before, hidden behind `Unknown`. They clear in one go whenever that
+bug is fixed, and no earlier.
 
 ## Optional or not: the rule we follow
 
@@ -120,9 +123,15 @@ the codebase had. `LoaderResult.__init__` declared `buffer: bytes = None`
 and `metadata: Dict[str, any] = None` — implicit `Optional`, plus the
 builtin `any` function where `typing.Any` was meant.
 
-**Phase 2** — `BaseFilter`, `BaseMetrics`, `BaseOptimizer`. The 32 filter
-subclasses inherit the contract, so they come along nearly for free. This is
-where `BaseFilter.engine`'s reachable `None` gets handled.
+**Phase 2 (done)** — `BaseFilter`, `FiltersFactory`, `FiltersRunner`,
+`filter_method`, `BaseMetrics` and `BaseOptimizer`, with their subclasses.
+The 32 filter subclasses inherit the contract and needed no changes.
+
+Phase 2 also corrected an inconsistency left by phase 1: `Context.modules`
+had been declared `ContextImporter | None`, although its `None` is the same
+construction artifact as `config` and `server`. Making it non-optional
+removed 25 diagnostics in `filters/frame.py` and elsewhere, and introduced
+no `redundant-condition` warnings on the existing `if self.modules` guards.
 
 **Phase 3** — `Protocol` definitions for the duck-typed plugin points that
 are modules rather than classes: loaders (`async def load(context, url)`),
@@ -153,4 +162,7 @@ change, and should be fixed on their own:
 - `BaseFilter.run()` assigns `None` to `self.engine` when there is no
   engine, which makes filters such as `background_color` raise
   `AttributeError`. Unreachable in a running server, since `context.modules`
-  is always present there.
+  is always present there — but it is what 82 of the current diagnostics
+  are reporting, all of the form `self.engine.<something>`. Fixing the
+  guard in `run()` would clear them all; annotating around it would only
+  hide the defect.
