@@ -13,7 +13,7 @@
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any, Callable
 from xml.etree.ElementTree import ParseError
 
 import piexif
@@ -22,6 +22,10 @@ from thumbor.engines.extensions.exif_orientation_editor import (
     ExifOrientationEditor,
 )
 from thumbor.utils import EXTENSION, logger
+
+if TYPE_CHECKING:
+    from thumbor.context import Context
+    from thumbor.point import FocalPoint
 
 try:
     import cairosvg
@@ -75,11 +79,11 @@ class EngineResult:
 
 
 class MultipleEngine:
-    def __init__(self, source_engine):
+    def __init__(self, source_engine: BaseEngine) -> None:
         self.frame_engines = []
         self.source_engine = source_engine
 
-    def add_frame(self, frame):
+    def add_frame(self, frame: Any) -> None:
         frame_engine = self.source_engine.__class__(self.source_engine.context)
         frame_engine.extension = self.source_engine.extension
         frame_engine.source_width = self.source_engine.source_width
@@ -88,16 +92,18 @@ class MultipleEngine:
 
         self.frame_engines.append(frame_engine)
 
-    def read(self, extension=None, quality=None):
+    def read(
+        self, extension: str | None = None, quality: int | None = None
+    ) -> bytes:
         return self.source_engine.read_multiple(
             [frame_engine.image for frame_engine in self.frame_engines],
             extension,
         )
 
-    def size(self):
+    def size(self) -> tuple[int, int]:
         return self.frame_engines[0].size
 
-    def do_many(self, name):
+    def do_many(self, name: str) -> Callable[..., list[Any]]:
         def exec_func(*args, **kwargs):
             result = []
             for frame_engine in self.frame_engines:
@@ -108,18 +114,37 @@ class MultipleEngine:
 
 
 class BaseEngine:
-    def __init__(self, context):
+    context: Context
+    # Whatever the concrete engine works on -- a PIL.Image for PILEngine,
+    # a dict for JSONEngine. Deliberately untyped at this level.
+    image: Any
+    extension: str | None
+    icc_profile: bytes | None
+    frame_count: int
+    metadata: dict[str, Any] | None
+    # load() sets both from the image size, so everything downstream reads
+    # them as ints; the None initialisers are a construction artifact.
+    source_width: int
+    source_height: int
+    # Only present once load() finds more than one frame. Every read goes
+    # through is_multiple(), which probes for it, so it is declared without
+    # None rather than narrowed at each of the call sites.
+    multiple_engine: MultipleEngine
+    # Set by engines that read EXIF, hence the hasattr guards around it.
+    exif: bytes | None
+
+    def __init__(self, context: Context) -> None:
         self.context = context
         self.image = None
         self.extension = None
-        self.source_width = None
-        self.source_height = None
+        self.source_width = None  # ty: ignore[invalid-assignment]
+        self.source_height = None  # ty: ignore[invalid-assignment]
         self.icc_profile = None
         self.frame_count = 1
         self.metadata = None
 
     @classmethod
-    def get_mimetype(cls, buffer):
+    def get_mimetype(cls, buffer: bytes) -> str | None:
         img_mime = None
 
         if buffer.startswith(b"GIF8"):
@@ -153,7 +178,7 @@ class BaseEngine:
 
         return img_mime
 
-    def wrap(self, multiple_engine):
+    def wrap(self, multiple_engine: MultipleEngine) -> None:
         for method_name in [
             "resize",
             "crop",
@@ -163,16 +188,16 @@ class BaseEngine:
             setattr(self, method_name, multiple_engine.do_many(method_name))
         setattr(self, "read", multiple_engine.read)
 
-    def is_multiple(self):
+    def is_multiple(self) -> bool:
         return (
             hasattr(self, "multiple_engine")
             and self.multiple_engine is not None
         )
 
-    def frame_engines(self):
+    def frame_engines(self) -> list[BaseEngine]:
         return self.multiple_engine.frame_engines
 
-    def convert_svg_to_png(self, buffer):
+    def convert_svg_to_png(self, buffer: bytes) -> bytes:
         if not cairosvg:
             logger.error(
                 "[BaseEngine] convert_svg_to_png failed: CairoSVG could not "
@@ -200,7 +225,7 @@ class BaseEngine:
 
         return buffer
 
-    def load(self, buffer, extension):
+    def load(self, buffer: bytes, extension: str | None) -> None:
         self.extension = extension
 
         if extension is None:
@@ -241,17 +266,17 @@ class BaseEngine:
             self.source_height = self.size[1]
 
     @property
-    def size(self):
+    def size(self) -> tuple[int, int]:
         if self.is_multiple():
             return self.multiple_engine.size()
         return self.image.size
 
-    def can_convert_to_webp(self):
+    def can_convert_to_webp(self) -> bool:
         return (
             self.size[0] <= WEBP_SIDE_LIMIT and self.size[1] <= WEBP_SIDE_LIMIT
         )
 
-    def normalize(self):
+    def normalize(self) -> bool:
         width, height = self.size
         self.source_width = width
         self.source_height = height
@@ -278,15 +303,15 @@ class BaseEngine:
 
         return False
 
-    def get_proportional_width(self, new_height):
+    def get_proportional_width(self, new_height: float) -> float:
         width, height = self.size
         return round(float(new_height) * width / height, 0)
 
-    def get_proportional_height(self, new_width):
+    def get_proportional_height(self, new_width: float) -> float:
         width, height = self.size
         return round(float(new_width) * height / width, 0)
 
-    def _get_exif_object(self):
+    def _get_exif_object(self) -> ExifOrientationEditor | None:
         if (not hasattr(self, "exif")) or self.exif is None:
             return None
 
@@ -297,7 +322,7 @@ class BaseEngine:
 
         return None
 
-    def get_orientation(self):
+    def get_orientation(self) -> int | None:
         """
         Returns the image orientation of the buffer image or None
         if it is undefined. Gets the original value from the Exif tag.
@@ -309,7 +334,7 @@ class BaseEngine:
 
         return exif.get_orientation() if exif else None
 
-    def reorientate(self, override_exif=True):
+    def reorientate(self, override_exif: bool = True) -> None:
         """
         Rotates the image in the buffer so that it is oriented correctly.
         If override_exif is True (default) then the metadata
@@ -352,64 +377,77 @@ class BaseEngine:
             except Exception as error:
                 logger.error("[exif] %s", error)
 
-    def gen_image(self, size, color):
+    def gen_image(self, size: tuple[int, int], color: str | None) -> Any:
         raise NotImplementedError()
 
-    def create_image(self, buffer):
+    def create_image(self, buffer: bytes) -> Any:
         raise NotImplementedError()
 
-    def crop(self, left, top, right, bottom):
+    def crop(self, left: int, top: int, right: int, bottom: int) -> None:
         raise NotImplementedError()
 
-    def resize(self, width, height):
+    def resize(self, width: float, height: float) -> None:
         raise NotImplementedError()
 
-    def focus(self, points):
+    def focus(self, points: list[FocalPoint]) -> None:
         pass
 
-    def flip_horizontally(self):
+    def flip_horizontally(self) -> None:
         raise NotImplementedError()
 
-    def flip_vertically(self):
+    def flip_vertically(self) -> None:
         raise NotImplementedError()
 
-    def rotate(self, degrees):
+    def rotate(self, degrees: float) -> None:
         """
         Rotates the image the given amount CCW.
         :param degrees: Amount to rotate in degrees.
         :type amount: int
         """
 
-    def read_multiple(self, images, extension=None):
+    def read_multiple(
+        self, images: list[Any], extension: str | None = None
+    ) -> bytes:
         raise NotImplementedError()
 
-    def read(self, extension, quality):
+    def read(
+        self, extension: str | None = None, quality: int | None = None
+    ) -> bytes:
         raise NotImplementedError()
 
-    def get_image_data(self):
+    def get_image_data(self) -> bytes:
         raise NotImplementedError()
 
-    def set_image_data(self, data):
+    def set_image_data(self, data: bytes) -> None:
         raise NotImplementedError()
 
-    def get_image_mode(self):
+    def get_image_mode(self) -> str:
         """Possible return values should be: RGB, RBG, GRB, GBR,
         BRG, BGR, RGBA, AGBR, ..."""
         raise NotImplementedError()
 
-    def paste(self, other_engine, pos, merge=True):
+    def paste(
+        self,
+        other_engine: BaseEngine,
+        pos: tuple[int, int],
+        merge: bool = True,
+    ) -> None:
         raise NotImplementedError()
 
-    def enable_alpha(self):
+    def enable_alpha(self) -> None:
         raise NotImplementedError()
 
-    def image_data_as_rgb(self, update_image=True):
+    def image_data_as_rgb(
+        self, update_image: bool = True
+    ) -> tuple[str, bytes]:
         raise NotImplementedError()
 
-    def strip_exif(self):
+    def strip_exif(self) -> None:
         pass
 
-    def convert_to_grayscale(self, update_image=True, alpha=True):
+    def convert_to_grayscale(
+        self, update_image: bool = True, alpha: bool = True
+    ) -> Any:
         raise NotImplementedError()
 
     def draw_rectangle(
@@ -417,31 +455,31 @@ class BaseEngine:
     ):  # pylint: disable=invalid-name
         raise NotImplementedError()
 
-    def strip_icc(self):
+    def strip_icc(self) -> None:
         pass
 
-    def extract_cover(self):
+    def extract_cover(self) -> Any:
         raise NotImplementedError()
 
-    def has_transparency(self):
+    def has_transparency(self) -> bool:
         raise NotImplementedError()
 
-    def avif_enabled(self):
+    def avif_enabled(self) -> bool:
         raise NotImplementedError()
 
-    def heif_enabled(self):
+    def heif_enabled(self) -> bool:
         raise NotImplementedError()
 
-    def cleanup(self):
+    def cleanup(self) -> None:
         pass
 
-    def can_auto_convert_png_to_jpg(self):
+    def can_auto_convert_png_to_jpg(self) -> bool:
         can_convert = self.extension == ".png" and not self.has_transparency()
 
         return can_convert
 
-    def can_auto_convert_to_avif(self):
+    def can_auto_convert_to_avif(self) -> bool:
         return self.avif_enabled()
 
-    def can_auto_convert_to_heif(self):
+    def can_auto_convert_to_heif(self) -> bool:
         return self.heif_enabled()

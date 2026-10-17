@@ -22,6 +22,9 @@ from thumbor.handlers import ImageApiHandler
 #   - or with the image content in the request body (rest style)
 ##
 class ImageUploadHandler(ImageApiHandler):
+    # tornado types its verb handlers as (*args: str, **kwargs: str);
+    # thumbor declares the concrete arguments its routes capture.
+    # ty: ignore[invalid-method-override]
     async def post(self):
         # Check if the image uploaded is a multipart/form-data
         if self.multipart_form_data():

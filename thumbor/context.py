@@ -10,7 +10,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, MutableMapping
 
 from thumbor.filters import FiltersFactory
 from thumbor.metrics.logger_metrics import Metrics
@@ -34,6 +34,7 @@ if TYPE_CHECKING:
     from thumbor.point import FocalPoint
     from thumbor.result_storages import BaseStorage as BaseResultStorage
     from thumbor.storages import BaseStorage
+    from thumbor.transformer import Transformer
 
 
 def _split_http_header(value, delimiter):
@@ -152,7 +153,11 @@ class Context:  # pylint: disable=too-many-instance-attributes
     app_class: str
     filters_factory: FiltersFactory
     thread_pool: ThreadPool
-    headers: dict[str, Any]
+    # Starts as a plain dict and is replaced by the handler with a copy of
+    # the tornado HTTPHeaders, which is a MutableMapping but not a dict.
+    headers: MutableMapping[str, Any]
+    # Built per request by BaseHandler.execute_image_operations.
+    transformer: Transformer
 
     def __init__(
         self,
@@ -322,6 +327,13 @@ class RequestParameters:  # pylint: disable=too-few-public-methods,too-many-inst
     # only reached by the bare RequestParameters() that BaseHandler.on_finish
     # builds to collect metrics, which never reads the url.
     url: str
+    # Assigned by the handlers rather than through __init__: the engine and
+    # extension once the image is loaded, meta_callback from the URL parser.
+    engine: BaseEngine
+    extension: str | None
+    # Either the configured name or the raw `callback` query argument,
+    # which tornado hands over as bytes.
+    meta_callback: str | bytes | None
 
     def __init__(  # pylint: disable=too-many-positional-arguments
         self,
@@ -414,7 +426,9 @@ class RequestParameters:  # pylint: disable=too-few-public-methods,too-many-inst
         self.image_url = image
         self.url = url  # ty: ignore[invalid-assignment]
         self.detection_error = None
-        self.quality = quality
+        # BaseHandler.execute_image_operations resets this to None when the
+        # request did not ask for a specific quality.
+        self.quality: int | None = quality
         self.buffer = None
 
         if focal_points is None:
