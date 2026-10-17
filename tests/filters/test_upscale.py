@@ -111,3 +111,29 @@ class UpscaleFilterTestCase(FilterTestCase):
 
         ssim = self.get_ssim(image, expected)
         assert ssim > 0.97
+
+    @gen_test
+    async def test_upscale_filter_with_orig_dimensions(self):
+        """A URL asking for the original size must not break the filter.
+
+        request.width and request.height stay as the string "orig" through
+        the transformer, so comparing them with the source size used to
+        raise TypeError and return a 500.
+        """
+
+        def config_context(context):
+            context.request.width = "orig"
+            context.request.height = "orig"
+
+        image = await self.get_filtered(
+            "source.jpg",
+            "thumbor.filters.upscale",
+            "upscale()",
+            config_context=config_context,
+        )
+
+        # Unchanged: there is nothing to upscale to.
+        expected = self.get_fixture("source.jpg")
+
+        ssim = self.get_ssim(image, expected)
+        assert ssim > 0.99

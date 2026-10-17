@@ -94,6 +94,9 @@ def deprecated(message):
 
 
 def get_profile_and_color_space(icc):
+    if ImageCms is None:
+        return None, None
+
     with BytesIO(icc) as buf:
         try:
             profile = ImageCms.ImageCmsProfile(buf)
@@ -133,11 +136,14 @@ def ensure_srgb(img, srgb_profile=None):
     if srgb_profile is not None:
         srgb_profile = ImageCms.ImageCmsProfile(srgb_profile)
     else:
+        # Built at import time whenever ImageCms is importable, which the
+        # guard above has already established. Not asserted, because an
+        # assert would vanish under python -O.
         srgb_profile = DEFAULT_SRGB_PROFILE
 
     orig_profile, color_space = get_profile_and_color_space(icc)
 
-    if not color_space:
+    if orig_profile is None or not color_space:
         return None
 
     if color_space == "RGB":
@@ -165,11 +171,13 @@ def ensure_srgb(img, srgb_profile=None):
 
     transform = ImageCms.ImageCmsTransform(
         orig_profile,
-        srgb_profile,
+        srgb_profile,  # ty: ignore[invalid-argument-type]
         pil_mode,
         "RGBA",
         intent=ImageCms.Intent.RELATIVE_COLORIMETRIC,
-        flags=TRANSFORM_FLAGS,
+        # Built by OR-ing flags looked up at import time so that both older
+        # and newer PIL versions work; the stub expects the Flags enum.
+        flags=TRANSFORM_FLAGS,  # ty: ignore[invalid-argument-type]
     )
 
     src_im = Image.new(pil_mode, img.size, "white")

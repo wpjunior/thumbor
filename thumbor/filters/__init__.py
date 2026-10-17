@@ -13,7 +13,16 @@ import collections
 import functools
 import re
 import time
-from typing import TYPE_CHECKING, Any, Awaitable, Callable, Iterable, Pattern
+from types import FunctionType
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Awaitable,
+    Callable,
+    Iterable,
+    Pattern,
+    Protocol,
+)
 
 if TYPE_CHECKING:
     from thumbor.context import Context
@@ -58,17 +67,28 @@ PHASE_PRE_LOAD = "pre-load"
 PHASE_AFTER_LOAD = "after-load"
 
 
-def filter_method(*args: Any) -> Callable[..., Any]:
-    def _filter_deco(
-        filtered_function: Callable[..., Any],
-    ) -> Callable[..., Any]:
+class RunnableMethod(Protocol):
+    """A filter method after filter_method has decorated it.
+
+    The decorator attaches filter_data to the wrapper, which pre_compile
+    then reads to build the filter's regex, so the attribute is part of the
+    contract rather than an implementation detail.
+    """
+
+    filter_data: dict[str, Any]
+
+    def __call__(self, *args: Any) -> Awaitable[Any]: ...
+
+
+def filter_method(*args: Any) -> Callable[[FunctionType], RunnableMethod]:
+    def _filter_deco(filtered_function: FunctionType) -> RunnableMethod:
         @functools.wraps(filtered_function)
-        async def wrapper(self, *args2):
+        async def wrapper(self: Any, *args2: Any) -> Any:
             return await filtered_function(self, *args2)
 
         defaults = None
         if filtered_function.__defaults__:
-            default_padding = [None] * (
+            default_padding: list[Any] = [None] * (
                 len(args) - (len(filtered_function.__defaults__))
             )
             defaults = default_padding + list(filtered_function.__defaults__)
@@ -82,7 +102,7 @@ def filter_method(*args: Any) -> Callable[..., Any]:
                 "defaults": defaults,
             },
         )
-        return wrapper
+        return wrapper  # ty: ignore[invalid-return-type]
 
     return _filter_deco
 
@@ -163,7 +183,7 @@ class BaseFilter:
 
     # Set on the subclass by pre_compile/compile_regex, which FiltersFactory
     # runs for every registered filter class.
-    runnable_method: Callable[..., Awaitable[Any]]
+    runnable_method: RunnableMethod
     parsers: list[Callable[[str], Any] | None]
     regex_str: str
     regex: Pattern[str] | None

@@ -58,9 +58,17 @@ def encode_multipart_formdata(fields, files):
             b'Content-Disposition: form-data; name="%s"; filename="%s"'
             % (key.encode(), filename.encode())
         )
+        # The `or` used to sit outside the %, so it applied to the whole
+        # formatted line instead of guarding the None that guess_type can
+        # return -- .encode() would already have raised.
+        guessed_type = mimetypes.guess_type(filename)[0]
         lines.append(
-            b"Content-Type: %s" % mimetypes.guess_type(filename)[0].encode()
-            or b"application/octet-stream"
+            b"Content-Type: %s"
+            % (
+                guessed_type.encode()
+                if guessed_type
+                else b"application/octet-stream"
+            )
         )
         lines.append(b"")
         lines.append(value)

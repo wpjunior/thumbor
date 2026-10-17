@@ -11,9 +11,12 @@ def signal_handler(server, config, sig, _):
     io_loop = tornado.ioloop.IOLoop.instance()
 
     def stop_loop(now, deadline):
+        # Private tornado internals, which is why neither pylint nor ty
+        # can see them. Pre-dates asyncio's IOLoop and has no public
+        # equivalent.
         if now < deadline and (
-            io_loop._callbacks  # pylint: disable=protected-access
-            or io_loop._timeouts  # pylint: disable=protected-access
+            io_loop._callbacks  # ty: ignore[unresolved-attribute] # pylint: disable=protected-access
+            or io_loop._timeouts  # ty: ignore[unresolved-attribute] # pylint: disable=protected-access
         ):
             logger.debug("Waiting for next tick")
             now += 1

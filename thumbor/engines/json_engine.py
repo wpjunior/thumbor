@@ -137,7 +137,7 @@ class JSONEngine(BaseEngine):
 
     def read(
         self, extension: str | None = None, quality: int | None = None
-    ) -> bytes:
+    ) -> bytes | str:
         target_width, target_height = self.get_target_dimensions()
         width, height = self.engine.size
         thumbor_json = {

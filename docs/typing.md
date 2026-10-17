@@ -46,7 +46,8 @@ done; the workflow files are untouched.
 
 The count started at **419** (ty 0.0.89, `thumbor/` only), was **375**
 after phase 1, **369** after phase 2, **323** after phase 3, **316** after
-phase 4, **155** after phase 5 and is **67** after phase 6. The number moves slowly on
+phase 4, **155** after phase 5, **67** after phase 6 and is **37** after
+phase 7. The number moves slowly on
 purpose: annotating a module often *reveals* errors that were previously
 hidden behind `Unknown`, so a phase can fix real problems while the total
 barely moves — or rises.
@@ -191,6 +192,32 @@ parameters in phase 1 although `CascadeLoaderDetector.detect` passes it
 `int + float`. `RequestParameters.url` is now declared non-optional, since
 `ImagingHandler` always passes the tornado request and
 `_set_request_headers` sets the url from its path.
+
+**Phase 7 (in progress)** — draining what was left, which by then was a
+long tail rather than any one cause. Three real defects came out of it:
+
+- `filters:upscale()` returned **HTTP 500** on any URL asking for the
+  original size, such as `/unsafe/origxorig/filters:upscale()/img.jpg`.
+  `request.width` stays as the string `"orig"` through the transformer, and
+  comparing it against the source size raised `TypeError`. Now the filter
+  returns early, since there is no target to scale up to.
+- `BaseEngine.read` was annotated `-> bytes` in phase 5, but `JSONEngine`
+  returns a JSON string, which is exactly why `BaseHandler._ensure_bytes`
+  exists. Corrected to `bytes | str`.
+- `thumbor/testing.py` built its multipart body with
+  `b"..." % guess_type(f)[0].encode() or b"application/octet-stream"`. The
+  `or` applied to the formatted line, not to the `None` that `guess_type`
+  can return, so `.encode()` would already have raised. The fallback never
+  worked.
+
+Two name collisions were also untangled: `curve.py` and `frame.py` both
+assigned a plain string to `regex`, which is the attribute `compile_regex`
+overwrites with the filter's compiled pattern. `curve.py`'s is a parameter
+spec and was renamed; `frame.py`'s was vestigial and removed.
+
+`filter_method` now returns a `RunnableMethod` protocol that carries the
+`filter_data` the decorator attaches, instead of a bare `Callable` that
+could not describe it.
 
 **Phase 6 (done)** — fixed the `BaseFilter.engine` defect the earlier
 phases had been recording.
