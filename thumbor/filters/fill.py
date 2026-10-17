@@ -13,6 +13,9 @@ from thumbor.filters.blur import apply_blur
 
 
 class Filter(BaseFilter):
+    # Reads self.engine; run() will not execute it without one.
+    uses_engine = True
+
     @staticmethod
     def target_dimension(requested, transformed, image_size):
         requested = image_size if requested in (0, "orig") else requested

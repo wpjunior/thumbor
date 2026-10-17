@@ -21,6 +21,9 @@ from thumbor.utils import logger
 
 
 class Filter(BaseFilter):
+    # Reads self.engine; run() will not execute it without one.
+    uses_engine = True
+
     watermark_buffer = None
 
     @staticmethod

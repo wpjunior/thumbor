@@ -169,13 +169,21 @@ class BaseFilter:
     regex: Pattern[str] | None
     phase: str
 
+    # Whether the filter's method reads self.engine. run() refuses to
+    # execute a filter that needs an engine without one, which is what lets
+    # engine be declared below as always-present: inside the method of a
+    # filter that sets this, it cannot be None. Filters that leave it False
+    # -- including third-party ones, which is why False is the default --
+    # still run without an engine, and must not touch it.
+    uses_engine = False
+
     params: list[Any] | None
     # Only FiltersFactory builds filters, and it always passes a context;
     # the None default is for direct construction in tests.
     context: Context
-    # run() assigns None here when the context has no engine, so this one
-    # really can be None. See the open findings in docs/typing.md.
-    engine: BaseEngine | None
+    # Guaranteed by run() for any filter with uses_engine set. The two
+    # assignments that can put None here are suppressed at the source.
+    engine: BaseEngine
 
     @classmethod
     def pre_compile(cls) -> str | None:
@@ -233,7 +241,7 @@ class BaseFilter:
             else None
         )
         self.context = context  # ty: ignore[invalid-assignment]
-        self.engine = (
+        self.engine = (  # ty: ignore[invalid-assignment]
             context.modules.engine if context and context.modules else None
         )
 
@@ -244,6 +252,12 @@ class BaseFilter:
         metrics = self.context.metrics if self.context else None
         filter_name = self.runnable_method.filter_data["name"]
         start = time.perf_counter()
+
+        if self.engine is None and self.uses_engine:
+            raise RuntimeError(
+                f"The {filter_name} filter operates on the image and "
+                "cannot run without an engine."
+            )
 
         if self.engine:
             if self.engine.is_multiple():
@@ -256,7 +270,9 @@ class BaseFilter:
         results = []
         try:
             for engine in engines_to_run:
-                self.engine = engine
+                # None only for filters that left uses_engine False, which
+                # the guard above has already let through.
+                self.engine = engine  # ty: ignore[invalid-assignment]
                 results.append(await self.runnable_method(*self.params))
             if metrics:
                 metrics.incr(f"filter.{filter_name}.count")

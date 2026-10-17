@@ -31,6 +31,9 @@ RED_THRESHOLD = 2.0
 
 
 class Filter(BaseFilter):
+    # Reads self.engine; run() will not execute it without one.
+    uses_engine = True
+
     @filter_method()
     async def red_eye(self) -> None:
         if not OPENCV_AVAILABLE:

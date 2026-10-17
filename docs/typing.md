@@ -46,7 +46,7 @@ done; the workflow files are untouched.
 
 The count started at **419** (ty 0.0.89, `thumbor/` only), was **375**
 after phase 1, **369** after phase 2, **323** after phase 3, **316** after
-phase 4 and is **155** after phase 5. The number moves slowly on
+phase 4, **155** after phase 5 and is **67** after phase 6. The number moves slowly on
 purpose: annotating a module often *reveals* errors that were previously
 hidden behind `Unknown`, so a phase can fix real problems while the total
 barely moves — or rises.
@@ -58,12 +58,10 @@ and `BaseEngine` each initialise their collaborators to `None`, so ty infers
 and the errors only clear when a link is annotated — fixing `Context` alone
 moved the total by 25.
 
-**86 of the remaining 155 are a single problem**: the reachable `None` on
-`BaseFilter.engine` (see the open findings below). Annotating `engine`
-honestly as `BaseEngine | None` is what makes them visible — they were
-there before, hidden behind `Unknown`. They clear in one go whenever that
-bug is fixed, and no earlier. `filters/` holds 106 diagnostics; 86 of them
-are this.
+86 of them were a single problem — the reachable `None` on
+`BaseFilter.engine` — and phase 6 fixed it, which is why the count finally
+moved a long way. The lesson held: those 86 were never 86 problems, and no
+amount of annotating around them would have been progress.
 
 ## Optional or not: the rule we follow
 
@@ -194,6 +192,33 @@ parameters in phase 1 although `CascadeLoaderDetector.detect` passes it
 `ImagingHandler` always passes the tornado request and
 `_set_request_headers` sets the url from its path.
 
+**Phase 6 (done)** — fixed the `BaseFilter.engine` defect the earlier
+phases had been recording.
+
+`run()` assigned `None` to `self.engine` when the context had no engine and
+then called the filter anyway, so any filter that reads the engine raised
+`AttributeError` on `NoneType` — saying nothing about which filter or why.
+The `[None]` branch could not simply go: filters that never touch the
+engine rely on it, and `tests/filters/test_base_filter.py` exercises
+exactly that with filters of its own.
+
+So `BaseFilter` now declares `uses_engine`, the 23 built-in filters that
+read `self.engine` set it to `True`, and `run()` raises a named
+`RuntimeError` instead of letting the `AttributeError` happen. The default
+is `False` so that third-party filters, which do not know about the flag,
+keep their current behaviour.
+
+That invariant is what makes `engine: BaseEngine` true rather than
+convenient: inside the method of a filter that declares the flag, it cannot
+be None, because `run()` refused to get there. Only the two assignments
+that can store `None` are suppressed.
+
+`tests/filters/test_base_filter.py` covers the refusal, the success path,
+and that a filter without the flag still runs. A fourth test walks every
+built-in filter and asserts the flag matches whether the source actually
+reads `self.engine`, so adding a filter that touches the engine and
+forgetting the flag fails the suite rather than reintroducing the bug.
+
 **Phase 5 (done)** — `BaseEngine` and `BaseHandler`, the two widest
 interfaces, and the partial gate described above.
 
@@ -262,10 +287,4 @@ change, and should be fixed on their own:
   anything without it — all 19 call sites pass it and the method would
   raise on `None`. Left as is, since the signature is public; the two
   resulting diagnostics are suppressed where they occur.
-- `BaseFilter.run()` assigns `None` to `self.engine` when there is no
-  engine, which makes filters such as `background_color` raise
-  `AttributeError`. Unreachable in a running server, since `context.modules`
-  is always present there — but it is what 82 of the current diagnostics
-  are reporting, all of the form `self.engine.<something>`. Fixing the
-  guard in `run()` would clear them all; annotating around it would only
-  hide the defect.
+

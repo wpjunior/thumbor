@@ -46,6 +46,9 @@ class Filter(BaseFilter):
         /filters:blur(4, 2)/
     """
 
+    # Reads self.engine; run() will not execute it without one.
+    uses_engine = True
+
     @filter_method(BaseFilter.PositiveNonZeroNumber, BaseFilter.DecimalNumber)
     async def blur(self, radius, sigma=0):
         mode, imgdata = self.engine.image_data_as_rgb()

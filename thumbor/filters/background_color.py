@@ -11,6 +11,9 @@ from thumbor.filters import BaseFilter, filter_method
 
 
 class Filter(BaseFilter):
+    # Reads self.engine; run() will not execute it without one.
+    uses_engine = True
+
     @filter_method(r"[\w]+")
     async def background_color(self, color):
         self.fill_engine = self.engine.__class__(self.context)

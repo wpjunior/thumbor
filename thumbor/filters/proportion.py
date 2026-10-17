@@ -11,6 +11,9 @@ from thumbor.filters import BaseFilter, filter_method
 
 
 class Filter(BaseFilter):
+    # Reads self.engine; run() will not execute it without one.
+    uses_engine = True
+
     @filter_method(BaseFilter.DecimalNumber)
     async def proportion(self, value):
         if value <= 0 or value > 1.0:
