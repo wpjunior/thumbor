@@ -8,20 +8,26 @@
 # Copyright (c) 2011 globo.com thumbor@googlegroups.com
 
 
+from __future__ import annotations
+
 import os
 from tempfile import NamedTemporaryFile
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from thumbor.context import Context
 
 
 class BaseOptimizer:
-    def __init__(self, context):
+    def __init__(self, context: Context) -> None:
         self.context = context
 
-    def should_run(
-        self, image_extension, image_buffer
-    ):  # pylint: disable=unused-argument
+    def should_run(  # pylint: disable=unused-argument
+        self, image_extension: str, image_buffer: bytes
+    ) -> bool:
         return True
 
-    def run_optimizer(self, image_extension, buffer):
+    def run_optimizer(self, image_extension: str, buffer: bytes) -> bytes:
         if not self.should_run(image_extension, buffer):
             return buffer
 
@@ -46,5 +52,7 @@ class BaseOptimizer:
             os.unlink(ifile.name)
             os.unlink(ofile.name)
 
-    def optimize(self, image_buffer, input_file, output_file):
+    def optimize(
+        self, image_buffer: bytes, input_file: str, output_file: str
+    ) -> None:
         raise NotImplementedError()
