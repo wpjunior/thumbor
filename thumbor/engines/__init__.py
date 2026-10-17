@@ -10,7 +10,10 @@
 # This is a base class, it makes sense to have many public methods and instance attributes
 # pylint: disable=attribute-defined-outside-init,too-many-public-methods,unused-argument,too-many-instance-attributes,broad-except
 
+from __future__ import annotations
+
 import re
+from typing import Any
 from xml.etree.ElementTree import ParseError
 
 import piexif
@@ -37,9 +40,18 @@ SVG_RE = re.compile(rb"<svg\b[^>]*?>", re.I)
 class EngineResult:
     COULD_NOT_LOAD_IMAGE = "could not load image"
 
+    buffer: bytes | None
+    successful: bool
+    error: str | None
+    metadata: dict[str, Any]
+
     def __init__(
-        self, buffer_=None, successful=True, error=None, metadata=None
-    ):
+        self,
+        buffer_: bytes | None = None,
+        successful: bool = True,
+        error: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
         """
         :param buffer: The media buffer
 

@@ -1,6 +1,10 @@
 [MASTER]
 ignore=tests/snapshots
 
+# Type stubs declare signatures without bodies, so every parameter reads as
+# unused. They are checked by ty, not pylint.
+ignore-patterns=.*\.pyi$
+
 [MESSAGES CONTROL]
 
 # Disable the message, report, category or checker with the given id(s). You
