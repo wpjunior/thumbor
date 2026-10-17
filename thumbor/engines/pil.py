@@ -30,7 +30,8 @@ try:
     from PIL import _avif  # pylint: disable=ungrouped-imports
 except ImportError:
     try:
-        from pillow_avif import _avif
+        # Ships no annotations; the module is probed for at runtime.
+        from pillow_avif import _avif  # ty: ignore[unresolved-import]
     except ImportError:
         _avif = None
 
@@ -61,8 +62,10 @@ KEEP_EXIF_COPYRIGHT_TAGS = [
     piexif.ImageIFD.DateTime,
 ]
 
-ImageFile.MAXBLOCK = 2**25
-ImageFile.LOAD_TRUNCATED_IMAGES = True
+# Pillow's own stubs type these as the literal of their default value, so
+# configuring them reads as an invalid assignment.
+ImageFile.MAXBLOCK = 2**25  # ty: ignore[invalid-assignment]
+ImageFile.LOAD_TRUNCATED_IMAGES = True  # ty: ignore[invalid-assignment]
 
 DECOMPRESSION_BOMB_EXCEPTIONS = (Image.DecompressionBombWarning,) + (
     (Image.DecompressionBombError,)
@@ -89,7 +92,12 @@ class Engine(BaseEngine):
             if self.context.config.MAX_PIXELS is None or int(
                 self.context.config.MAX_PIXELS
             ):
-                Image.MAX_IMAGE_PIXELS = self.context.config.MAX_PIXELS
+                # MAX_PIXELS is a float in the config (75e6) while
+                # Pillow's stub says int | None; the except below is what
+                # handles a genuinely wrong type.
+                Image.MAX_IMAGE_PIXELS = (
+                    self.context.config.MAX_PIXELS  # ty: ignore[invalid-assignment]
+                )
         except (AttributeError, TypeError, ValueError):  # invalid type
             logger.info(
                 "MAX_PIXELS config variable set to invalid type. Has to be int on None"

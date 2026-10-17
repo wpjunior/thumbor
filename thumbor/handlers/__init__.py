@@ -1213,7 +1213,8 @@ class BaseHandler(tornado.web.RequestHandler):
         if exists:
             blacklist = await self.context.modules.storage.get(filename)
 
-            return blacklist.decode()
+            if blacklist is not None:
+                return blacklist.decode()
 
         return ""
 

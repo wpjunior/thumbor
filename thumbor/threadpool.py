@@ -7,6 +7,8 @@
 # http://www.opensource.org/licenses/mit-license
 # Copyright (c) 2011 globo.com thumbor@googlegroups.com
 
+from __future__ import annotations
+
 import concurrent.futures
 
 from tornado.ioloop import IOLoop
@@ -15,20 +17,25 @@ from thumbor.utils import logger
 
 
 class ThreadPool:
+    # Declared so the guard in instance() can test it directly instead of
+    # reaching for getattr with a default.
+    _instance: dict[int, ThreadPool] | None = None
+
     @classmethod
-    def instance(cls, size):
+    def instance(cls, size: int) -> ThreadPool:
         """
         Cache threadpool since context is
         recreated for each request
         """
-        if not getattr(cls, "_instance", None):
-            cls._instance = {}
-        if size not in cls._instance:
-            cls._instance[size] = ThreadPool(size)
-        return cls._instance[size]
+        instances = cls._instance
+        if instances is None:
+            instances = cls._instance = {}
+        if size not in instances:
+            instances[size] = ThreadPool(size)
+        return instances[size]
 
     @classmethod
-    def reset(cls):
+    def reset(cls) -> None:
         if cls._instance is not None:
             for instance in cls._instance.values():
                 instance.cleanup()

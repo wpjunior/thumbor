@@ -19,6 +19,12 @@ class Filter(BaseFilter):
         target_width = self.context.request.width
         target_height = self.context.request.height
 
+        # A dimension arrives as the string "orig" when the URL asks for the
+        # source size, in which case there is no target to scale up to.
+        # Comparing it against the source raised TypeError before this.
+        if isinstance(target_width, str) or isinstance(target_height, str):
+            return
+
         source_width, source_height = self.engine.size
 
         if source_width >= target_width or source_height >= target_height:

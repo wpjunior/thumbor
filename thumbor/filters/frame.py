@@ -19,7 +19,6 @@ class Filter(BaseFilter):
     # Reads self.engine; run() will not execute it without one.
     uses_engine = True
 
-    regex = r"(?:frame\((?P<url>.*?))"
     nine_patch_buffer = None
 
     async def on_image_ready(self, buffer):

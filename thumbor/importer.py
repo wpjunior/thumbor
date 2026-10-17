@@ -217,7 +217,11 @@ class Importer:  # pylint: disable=too-many-instance-attributes
                 module = self.import_class(f"{conf_value}.{class_name}")
             else:
                 module = self.import_class(conf_value, get_module=True)
-            setattr(self, config_key.lower(), module)
+            setattr(
+                self,
+                config_key.lower(),  # ty: ignore[unresolved-attribute]
+                module,
+            )
 
     def load_multiple_item(  # pylint: disable=too-many-positional-arguments
         self,

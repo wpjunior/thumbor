@@ -9,7 +9,7 @@
 
 import tornado.ioloop
 import tornado.web
-from libthumbor.url import Url  # type: ignore
+from libthumbor.url import Url
 
 from thumbor.handlers.imaging import ImagingHandler
 

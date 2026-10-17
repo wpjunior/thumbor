@@ -27,9 +27,11 @@ class Filter(BaseFilter):
     # Reads self.engine; run() will not execute it without one.
     uses_engine = True
 
-    regex = r"\[(?:\(\d+,\d+\),?)*\]"
+    # Named to avoid colliding with BaseFilter.regex, which compile_regex
+    # replaces with the compiled pattern for the whole filter.
+    CURVE_PARAM = r"\[(?:\(\d+,\d+\),?)*\]"
 
-    @filter_method(regex, regex, regex, regex)
+    @filter_method(CURVE_PARAM, CURVE_PARAM, CURVE_PARAM, CURVE_PARAM)
     async def curve(self, alpha, red, green, blue):
         mode, data = self.engine.image_data_as_rgb()
         imgdata = _curve.apply(

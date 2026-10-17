@@ -94,7 +94,7 @@ class MultipleEngine:
 
     def read(
         self, extension: str | None = None, quality: int | None = None
-    ) -> bytes:
+    ) -> bytes | str:
         return self.source_engine.read_multiple(
             [frame_engine.image for frame_engine in self.frame_engines],
             extension,
@@ -407,12 +407,14 @@ class BaseEngine:
 
     def read_multiple(
         self, images: list[Any], extension: str | None = None
-    ) -> bytes:
+    ) -> bytes | str:
         raise NotImplementedError()
 
+    # JSONEngine returns a JSON document rather than an image, which is
+    # why BaseHandler pipes the result through _ensure_bytes.
     def read(
         self, extension: str | None = None, quality: int | None = None
-    ) -> bytes:
+    ) -> bytes | str:
         raise NotImplementedError()
 
     def get_image_data(self) -> bytes:
