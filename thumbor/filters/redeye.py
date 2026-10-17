@@ -7,8 +7,10 @@
 # http://www.opensource.org/licenses/mit-license
 # Copyright (c) 2011 globo.com thumbor@googlegroups.com
 
-# pylint: disable=no-member
 from os.path import abspath, dirname, join
+
+# pylint: disable=no-member
+from typing import Any
 
 from thumbor.filters import BaseFilter, filter_method
 from thumbor.utils import logger
@@ -127,7 +129,12 @@ class Filter(BaseFilter):
                     cv2.MORPH_CLOSE,
                     cv2.getStructuringElement(cv2.MORPH_DILATE, (5, 5)),
                 )
-                mask = cv2.dilate(mask, (3, 3), iterations=3)
+                # Passing a tuple where the stub wants a kernel array.
+                # cv2 accepts it, treating it as no kernel, so changing it
+                # would change the output -- see docs/typing.md.
+                mask = cv2.dilate(  # ty: ignore[no-matching-overload]
+                    mask, (3, 3), iterations=3
+                )
 
                 # The information of only red color is lost,
                 # So we fill the mean of blue and green color in all
@@ -148,7 +155,7 @@ class Filter(BaseFilter):
         self.engine.set_image_data(image.tobytes())
 
     @property
-    def cascade(self) -> None:
+    def cascade(self) -> Any:
         if not hasattr(self, "_cascade"):
             setattr(self, "_cascade", cv2.CascadeClassifier(CASCADE_FILE_PATH))
 

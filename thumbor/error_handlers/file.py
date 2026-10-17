@@ -6,6 +6,7 @@ import logging.handlers
 import operator
 import re
 import time
+from typing import Any
 
 from thumbor import __version__
 
@@ -46,7 +47,12 @@ class ErrorHandler:
             self.logger.addHandler(logging.handlers.WatchedFileHandler(file))
 
         req = handler.request
-        extra = {"thumbor-version": __version__, "timestamp": time.time()}
+        # Holds a version string, a timestamp and then the request headers,
+        # so it cannot be inferred from its initial contents.
+        extra: dict[str, Any] = {
+            "thumbor-version": __version__,
+            "timestamp": time.time(),
+        }
         extra.update({"Headers": req.headers})
         cookies_header = extra.get("Headers", {}).get("Cookie", {})
         if isinstance(cookies_header, str):

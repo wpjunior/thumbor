@@ -96,9 +96,8 @@ class Engine(BaseEngine):
                 # Pillow's stub says int | None; the except below is what
                 # handles a genuinely wrong type.
                 max_pixels = self.context.config.MAX_PIXELS
-                Image.MAX_IMAGE_PIXELS = (
-                    max_pixels  # ty: ignore[invalid-assignment]
-                )
+                # ty: ignore[invalid-assignment]
+                Image.MAX_IMAGE_PIXELS = max_pixels
         except (AttributeError, TypeError, ValueError):  # invalid type
             logger.info(
                 "MAX_PIXELS config variable set to invalid type. Has to be int on None"
@@ -600,7 +599,12 @@ class Engine(BaseEngine):
             logger.exception(
                 "Could not save as improved image, consider to increase ImageFile.MAXBLOCK"
             )
-            self.image.save(img_buffer, FORMATS[ext])
+            # ext comes from self.extension, which load() always sets
+            # before anything reaches read().
+            self.image.save(
+                img_buffer,
+                FORMATS[ext],  # ty: ignore[invalid-argument-type]
+            )
 
         results = img_buffer.getvalue()
         img_buffer.close()

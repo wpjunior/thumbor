@@ -87,7 +87,8 @@ class ImagingHandler(ContextHandler):
 
         if self.context.config.USE_BLACKLIST:
             blacklist = await self.get_blacklist_contents()
-            if self.context.request.image_url in blacklist:
+            image_url = self.context.request.image_url
+            if image_url is not None and image_url in blacklist:
                 self._error(
                     400,
                     f"Source image url has been blacklisted: {self.context.request.image_url}",
@@ -96,8 +97,10 @@ class ImagingHandler(ContextHandler):
 
         url_signature = self.context.request.hash
         if url_signature:
+            # load_security_key rejects an empty key, and the server
+            # cannot sign URLs without one.
             signer = self.context.modules.url_signer(
-                self.context.server.security_key
+                self.context.server.security_key  # ty: ignore[invalid-argument-type]
             )
 
             try:
@@ -120,7 +123,7 @@ class ImagingHandler(ContextHandler):
             ):
                 # Retrieves security key for this image if it has been seen before
                 security_key = await self.context.modules.storage.get_crypto(
-                    self.context.request.image_url
+                    self.context.request.image_url  # ty: ignore[invalid-argument-type]
                 )
                 if security_key is not None:
                     signer = self.context.modules.url_signer(security_key)

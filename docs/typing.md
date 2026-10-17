@@ -35,9 +35,14 @@ not block anything while a newly introduced problem does.
 
 That is the mechanism for finishing a rule off: drive it to zero, delete its
 line from `[tool.ty.rules]`, and from then on it is an error that the gate
-catches. `invalid-method-override`, `call-non-callable`, `missing-argument`,
-`invalid-parameter-default`, `invalid-type-form` and `redundant-condition`
-went through this already.
+catches. Only three rules are still warnings, and all three are the open
+findings below. Everything else — `invalid-argument-type`,
+`invalid-assignment`, `unsupported-operator`, `no-matching-overload`,
+`invalid-return-type`, `unresolved-import`, `not-subscriptable`,
+`not-iterable`, `unused-type-ignore-comment`, `invalid-method-override`,
+`call-non-callable`, `missing-argument`, `invalid-parameter-default`,
+`invalid-type-form`, `redundant-condition`,
+`too-many-positional-arguments` — is an error the gate enforces.
 
 Wiring it into CI and pre-commit is the remaining step and has not been
 done; the workflow files are untouched.
@@ -46,8 +51,8 @@ done; the workflow files are untouched.
 
 The count started at **419** (ty 0.0.89, `thumbor/` only), was **375**
 after phase 1, **369** after phase 2, **323** after phase 3, **316** after
-phase 4, **155** after phase 5, **67** after phase 6, **37** after phase 7
-and is **21** after phase 8. The number moves slowly on
+phase 4, **155** after phase 5, **67** after phase 6, **37** after phase 7,
+**21** after phase 8 and is **5** after phase 9. The number moves slowly on
 purpose: annotating a module often *reveals* errors that were previously
 hidden behind `Unknown`, so a phase can fix real problems while the total
 barely moves — or rises.
@@ -193,6 +198,25 @@ parameters in phase 1 although `CascadeLoaderDetector.detect` passes it
 `ImagingHandler` always passes the tornado request and
 `_set_request_headers` sets the url from its path.
 
+**Phase 9 (done)** — took the count to the five diagnostics that cannot be
+fixed without changing behaviour, and promoted nine rules out of the warn
+list as a result.
+
+Two more annotations were wrong rather than merely missing:
+`redeye.Filter.cascade` was declared `-> None` but returns the OpenCV
+cascade classifier, and `error_handlers/file.py` built a dict from a
+version string and a timestamp and then put the request headers in it, so
+it needed declaring rather than inferring.
+
+`upload.py` called `guess_extension` on a mime type that can be `None`
+when neither the Content-Type header nor the body identifies the image.
+The code right below already handled a missing extension with `""`, so the
+guard just gets it there instead of raising first.
+
+The suppressions that remain are mostly one upstream cause: tornado
+declares `HTTPServerRequest.query` and `.path` with legacy type comments
+over `None` class attributes, which ty reads as `None | Unknown | str`.
+
 **Phase 8 (done)** — more draining, and two more defects.
 
 `ImageResourceHandler.check_resource` called `get_mimetype` on whatever
@@ -300,6 +324,10 @@ change, and should be fixed on their own:
 - `RequestParameters.filters` defaults to `[]` but arrives from the URL as a
   `str`, and is consumed with `.split("):")`. The annotation records the
   union rather than papering over it.
+- `redeye` passes a tuple to `cv2.dilate` where the stub wants a kernel
+  array. OpenCV accepts it, treating it as no kernel at all, so correcting
+  it would change the filter's output and needs someone to look at the
+  result.
 - `ImageApiHandler.validate(body)` and `BaseHandler.validate(path)` share a
   name by accident and do unrelated things — one checks an upload body, the
   other a loader path. The subclass shadows the parent in a hierarchy where

@@ -460,7 +460,9 @@ class RequestParameters:  # pylint: disable=too-few-public-methods,too-many-inst
 
     def _set_request_headers(self, request: HTTPServerRequest) -> None:
         accept_header = ""
-        self.url = request.path
+        # Same legacy type comment as request.query above; tornado always
+        # sets path from the URI.
+        self.url = request.path  # ty: ignore[invalid-assignment]
         if request.headers:
             self.headers = request.headers
             accept_header = request.headers.get("Accept", "")

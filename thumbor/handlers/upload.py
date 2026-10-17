@@ -47,12 +47,19 @@ class ImageUploadHandler(ImageApiHandler):
                 content_type = self.request.headers.get(
                     "Content-Type", BaseEngine.get_mimetype(body)
                 )
-                extension = mimetypes.guess_extension(
-                    content_type.split(";", 1)[0], False
+                extension = (
+                    mimetypes.guess_extension(
+                        content_type.split(";", 1)[0], False
+                    )
+                    if content_type
+                    else None
                 )
                 if extension is None:  # Content-Type is unknown, try with body
-                    extension = mimetypes.guess_extension(
-                        BaseEngine.get_mimetype(body), False
+                    body_mime = BaseEngine.get_mimetype(body)
+                    extension = (
+                        mimetypes.guess_extension(body_mime, False)
+                        if body_mime
+                        else None
                     )
                 if extension == ".jpe":
                     extension = (
