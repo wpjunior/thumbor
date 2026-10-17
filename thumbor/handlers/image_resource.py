@@ -22,28 +22,33 @@ class ImageResourceHandler(ImageApiHandler):
         # Check if image exists
         exists = await self.context.modules.storage.exists(file_id)
 
-        if exists:
-            body = await self.context.modules.storage.get(file_id)
-            self.set_status(200)
+        body = (
+            await self.context.modules.storage.get(file_id) if exists else None
+        )
 
-            mime = BaseEngine.get_mimetype(body)
-            if mime:
-                self.set_header("Content-Type", mime)
-
-            max_age = self.context.config.MAX_AGE
-            if max_age:
-                self.set_header(
-                    "Cache-Control", "max-age=" + str(max_age) + ",public"
-                )
-                self.set_header(
-                    "Expires",
-                    datetime.datetime.utcnow()
-                    + datetime.timedelta(seconds=max_age),
-                )
-            self.write(body)
-            self.finish()
-        else:
+        if body is None:
             self._error(404, "Image not found at the given URL")
+
+            return
+
+        self.set_status(200)
+
+        mime = BaseEngine.get_mimetype(body)
+        if mime:
+            self.set_header("Content-Type", mime)
+
+        max_age = self.context.config.MAX_AGE
+        if max_age:
+            self.set_header(
+                "Cache-Control", "max-age=" + str(max_age) + ",public"
+            )
+            self.set_header(
+                "Expires",
+                datetime.datetime.utcnow()
+                + datetime.timedelta(seconds=max_age),
+            )
+        self.write(body)
+        self.finish()
 
     # tornado types its verb handlers as (*args: str, **kwargs: str);
     # thumbor declares the concrete arguments its routes capture.

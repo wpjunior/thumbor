@@ -101,9 +101,9 @@ class ImagingHandler(ContextHandler):
             )
 
             try:
-                quoted_hash = quote(self.context.request.hash)
+                quoted_hash = quote(url_signature)
             except KeyError:
-                self._error(400, f"Invalid hash: {self.context.request.hash}")
+                self._error(400, f"Invalid hash: {url_signature}")
                 return
 
             url_to_validate = self._strip_url_signature_prefix(

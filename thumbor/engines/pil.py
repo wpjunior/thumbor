@@ -95,8 +95,9 @@ class Engine(BaseEngine):
                 # MAX_PIXELS is a float in the config (75e6) while
                 # Pillow's stub says int | None; the except below is what
                 # handles a genuinely wrong type.
+                max_pixels = self.context.config.MAX_PIXELS
                 Image.MAX_IMAGE_PIXELS = (
-                    self.context.config.MAX_PIXELS  # ty: ignore[invalid-assignment]
+                    max_pixels  # ty: ignore[invalid-assignment]
                 )
         except (AttributeError, TypeError, ValueError):  # invalid type
             logger.info(
