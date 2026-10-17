@@ -9,8 +9,7 @@
 
 from __future__ import annotations
 
-from typing import Any
-
+from thumbor.point import FocalPointDict
 from thumbor.storages import BaseStorage
 
 
@@ -21,13 +20,17 @@ class Storage(BaseStorage):
     async def put_crypto(self, path: str) -> str | None:
         return path
 
-    async def put_detector_data(self, path: str, data: Any) -> str | None:
+    async def put_detector_data(
+        self, path: str, data: list[FocalPointDict]
+    ) -> str | None:
         return path
 
     async def get_crypto(self, path: str) -> str | None:
         return None
 
-    async def get_detector_data(self, path: str) -> Any | None:
+    async def get_detector_data(
+        self, path: str
+    ) -> list[FocalPointDict] | None:
         return None
 
     async def get(self, path: str) -> bytes | None:

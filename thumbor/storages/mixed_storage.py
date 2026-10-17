@@ -15,6 +15,7 @@ from thumbor.storages import BaseStorage
 
 if TYPE_CHECKING:
     from thumbor.context import Context
+    from thumbor.point import FocalPointDict
 
 
 class Storage(BaseStorage):
@@ -78,7 +79,9 @@ class Storage(BaseStorage):
         self._init_file_storage()
         return await self.file_storage.put(path, file_bytes)
 
-    async def put_detector_data(self, path: str, data: Any) -> str | None:
+    async def put_detector_data(
+        self, path: str, data: list[FocalPointDict]
+    ) -> str | None:
         self._init_detector_storage()
         return await self.detector_storage.put_detector_data(path, data)
 
@@ -91,7 +94,9 @@ class Storage(BaseStorage):
         result = await self.crypto_storage.get_crypto(path)
         return result
 
-    async def get_detector_data(self, path: str) -> Any | None:
+    async def get_detector_data(
+        self, path: str
+    ) -> list[FocalPointDict] | None:
         self._init_detector_storage()
         result = await self.detector_storage.get_detector_data(path)
         return result

@@ -83,3 +83,51 @@ class ConfigStubTestCase(TestCase):
         assert generator.annotation_for([]) == "list[Any]"
         assert generator.annotation_for(["a", 1]) == "list[Any]"
         assert generator.annotation_for(object()) == "Any"
+
+    def test_no_orphan_type_overrides(self):
+        """Every TYPE_OVERRIDES key must still be a defined option.
+
+        An override whose option was renamed or removed would sit there
+        silently, and the option it was meant to describe would quietly go
+        back to Any.
+        """
+
+        generator = load_generator()
+        defined = set(generator.Config.class_defaults)
+
+        orphans = sorted(set(generator.TYPE_OVERRIDES) - defined)
+
+        assert (
+            not orphans
+        ), f"TYPE_OVERRIDES names options that no longer exist: {orphans}"
+
+    def test_overrides_only_cover_uninferable_defaults(self):
+        """Overrides exist for defaults that say nothing about their type.
+
+        A default that already implies a type should not be overridden by
+        hand: the inference is the single source of truth there.
+        """
+
+        generator = load_generator()
+        defaults = generator.Config.class_defaults
+
+        for name in generator.TYPE_OVERRIDES:
+            default = defaults[name]
+
+            assert default is None or default == [], (
+                f"{name} has the informative default {default!r}; drop its "
+                "override and let the generator infer it"
+            )
+
+    def test_no_option_is_left_as_bare_any(self):
+        """Any as a whole annotation means we failed to describe an option."""
+
+        generator = load_generator()
+        bare_any = [
+            name
+            for _, options in generator.collect_options()
+            for name, annotation in options
+            if annotation == "Any"
+        ]
+
+        assert not bare_any, f"options still annotated Any: {bare_any}"

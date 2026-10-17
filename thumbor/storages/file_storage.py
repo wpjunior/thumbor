@@ -15,10 +15,10 @@ from datetime import datetime
 from json import dumps, loads
 from os.path import dirname, exists, getmtime, splitext
 from shutil import move
-from typing import Any
 from uuid import uuid4
 
 from thumbor import storages
+from thumbor.point import FocalPointDict
 from thumbor.utils import logger
 
 
@@ -75,7 +75,9 @@ class Storage(storages.BaseStorage):
 
         return file_abspath
 
-    async def put_detector_data(self, path: str, data: Any) -> str | None:
+    async def put_detector_data(
+        self, path: str, data: list[FocalPointDict]
+    ) -> str | None:
         file_abspath = self.path_on_filesystem(path)
 
         path = f"{splitext(file_abspath)[0]}.detectors.txt"
@@ -113,7 +115,9 @@ class Storage(storages.BaseStorage):
         with open(crypto_file, "r", encoding="utf-8") as crypto_f:
             return crypto_f.read()
 
-    async def get_detector_data(self, path: str) -> Any | None:
+    async def get_detector_data(
+        self, path: str
+    ) -> list[FocalPointDict] | None:
         file_abspath = self.path_on_filesystem(path)
         path = f"{splitext(file_abspath)[0]}.detectors.txt"
 

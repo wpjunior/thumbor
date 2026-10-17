@@ -9,7 +9,23 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Mapping, TypedDict
+
+
+class FocalPointDict(TypedDict):
+    """The serialised form of a focal point.
+
+    This is what goes into detector storage and into the JSON engine's
+    output, so the keys are a stored format rather than an internal
+    detail. Note that `z` holds the weight.
+    """
+
+    x: int
+    y: int
+    z: float
+    height: int
+    width: int
+    origin: str
 
 
 class FocalPoint:
@@ -29,7 +45,7 @@ class FocalPoint:
     weight: float
     origin: str
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> FocalPointDict:
         return {
             "x": self.x,
             "y": self.y,
@@ -40,7 +56,10 @@ class FocalPoint:
         }
 
     @classmethod
-    def from_dict(cls, values: dict[str, Any]) -> FocalPoint:
+    def from_dict(cls, values: Mapping[str, Any]) -> FocalPoint:
+        # Deliberately a loose Mapping rather than FocalPointDict: these
+        # come back as JSON from detector storage, possibly written by an
+        # older thumbor, and width/height/origin are defaulted below.
         return cls(
             x=int(values["x"]),
             y=int(values["y"]),
