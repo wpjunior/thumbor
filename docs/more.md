@@ -7,5 +7,6 @@ maxdepth: 1
 the_team
 whos_using_it
 hacking_on_thumbor
+typing
 licensing
 ```

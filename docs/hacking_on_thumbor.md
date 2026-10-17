@@ -61,6 +61,13 @@ Even if that's the case, don't forget to run `make flake isort pylint` before
 committing and fixing any issues you find. That way you won't get a request for
 doing so in your PR.
 
+## Type checking
+
+thumbor is being annotated incrementally. `make typecheck` runs
+[ty](https://github.com/astral-sh/ty) over the package and reports what it
+finds, but it does not fail the build and is not part of `make test` or CI
+yet. See {doc}`typing` for the baseline and the roadmap.
+
 ## Pull Requests
 
 After hacking and testing your contribution, it is time to make a pull request.

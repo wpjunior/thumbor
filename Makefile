@@ -10,7 +10,7 @@ UV_RUN_TESTS = $(UV_RUN_DEV) --extra all
 	bootstrap-uv build build_docs ci_test compile_ext coverage docs flake \
 	format isort integration integration_run int lcov pint pintegration \
 	pre-commit publish pylint run run-prod sequential-unit setup setup-ci \
-	setup_docs test unit
+	setup_docs test typecheck unit
 
 OS := $(shell uname)
 
@@ -93,6 +93,18 @@ isort:
 
 pylint: compile_ext
 	@$(UV_RUN_TESTS) pylint --load-plugins=pylint.extensions.no_self_use thumbor tests
+
+# Reporting only: thumbor is being annotated incrementally, so this never
+# fails the build and is deliberately absent from `test` and from CI. See
+# docs/typing.md for the roadmap and for when it becomes a gate.
+typecheck:
+	@out="$$($(UV_RUN_TESTS) ty check --exit-zero 2>&1)"; \
+	echo "$$out"; \
+	echo ""; \
+	echo "Diagnostics by rule:"; \
+	echo "$$out" \
+		| sed -nE 's/^[^ ]+ (error|warning)\[([a-z-]+)\].*/\2/p' \
+		| sort | uniq -c | sort -rn
 
 setup_docs:
 	@$(UV) sync --locked --inexact --group docs
