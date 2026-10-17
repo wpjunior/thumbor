@@ -7,11 +7,17 @@
 # http://www.opensource.org/licenses/mit-license
 # Copyright (c) 2011 globo.com thumbor@googlegroups.com
 
+from __future__ import annotations
+
 import math
 import sys
+from typing import TYPE_CHECKING
 
 from thumbor.point import FocalPoint
 from thumbor.utils import logger
+
+if TYPE_CHECKING:
+    from thumbor.context import Context
 
 try:
     from thumbor.ext.filters import _bounding_box
@@ -21,12 +27,19 @@ except ImportError:
 
 
 class Transformer:
-    def __init__(self, context):
+    # Filled by adjust_focal_points and _calculate_target_dimensions, both
+    # of which run before anything reads these. Same construction-artifact
+    # rule as elsewhere; see docs/typing.md.
+    focal_points: list[FocalPoint]
+    target_width: float
+    target_height: float
+
+    def __init__(self, context: Context) -> None:
         self.context = context
         self.engine = self.context.request.engine
-        self.focal_points = None
-        self.target_height = None
-        self.target_width = None
+        self.focal_points = None  # ty: ignore[invalid-assignment]
+        self.target_height = None  # ty: ignore[invalid-assignment]
+        self.target_width = None  # ty: ignore[invalid-assignment]
         self.requested_height = self.context.request.height
         self.requested_width = self.context.request.width
 
@@ -117,7 +130,7 @@ class Transformer:
         self.context.request.width = width
         self.context.request.height = height
 
-    def get_target_dimensions(self):
+    def get_target_dimensions(self) -> tuple[int, int]:
         """
         Returns the target dimensions and calculates them if necessary.
         The target dimensions are display independent.
@@ -128,10 +141,10 @@ class Transformer:
             self._calculate_target_dimensions()
         return int(self.target_width), int(self.target_height)
 
-    def adjust_focal_points(self):
+    def adjust_focal_points(self) -> None:
         source_width, source_height = self.engine.size
 
-        self.focal_points = None
+        self.focal_points = None  # ty: ignore[invalid-assignment]
 
         if self.context.request.focal_points:
             if self.context.request.should_crop:

@@ -259,11 +259,11 @@ async def load(
         response = await client.fetch(req, raise_error=True)
     except tornado.httpclient.HTTPClientError as err:
         response = tornado.httpclient.HTTPResponse(
-            req, err.code, reason=err.message, start_time=start
+            req, err.code, reason=err.message, start_time=start.timestamp()
         )
     except socket.gaierror as err:
         response = tornado.httpclient.HTTPResponse(
-            req, 599, reason=str(err), start_time=start
+            req, 599, reason=str(err), start_time=start.timestamp()
         )
 
     return return_contents_fn(

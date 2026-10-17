@@ -119,7 +119,12 @@ class Filter(BaseFilter):
             buffer = result
 
         self.nine_patch_engine.load(buffer, None)
-        await self.storage.put(self.url, self.nine_patch_engine.read())
+        # read() is bytes | str because JSONEngine returns a document;
+        # this engine renders an image.
+        await self.storage.put(
+            self.url,
+            self.nine_patch_engine.read(),  # ty: ignore[invalid-argument-type]
+        )
         await self.storage.put_crypto(self.url)
         self.nine_patch_buffer = buffer
         await self.on_image_ready(buffer)

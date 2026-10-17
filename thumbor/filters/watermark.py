@@ -214,7 +214,8 @@ class Filter(BaseFilter):
             else:
                 buffer = result
 
-            await self.storage.put(self.url, buffer)
+            if buffer is not None:
+                await self.storage.put(self.url, buffer)
             await self.storage.put_crypto(self.url)
             self.watermark_buffer = buffer
             self.on_image_ready(buffer)

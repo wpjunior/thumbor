@@ -46,8 +46,8 @@ done; the workflow files are untouched.
 
 The count started at **419** (ty 0.0.89, `thumbor/` only), was **375**
 after phase 1, **369** after phase 2, **323** after phase 3, **316** after
-phase 4, **155** after phase 5, **67** after phase 6 and is **37** after
-phase 7. The number moves slowly on
+phase 4, **155** after phase 5, **67** after phase 6, **37** after phase 7
+and is **21** after phase 8. The number moves slowly on
 purpose: annotating a module often *reveals* errors that were previously
 hidden behind `Unknown`, so a phase can fix real problems while the total
 barely moves — or rises.
@@ -193,7 +193,26 @@ parameters in phase 1 although `CascadeLoaderDetector.detect` passes it
 `ImagingHandler` always passes the tornado request and
 `_set_request_headers` sets the url from its path.
 
-**Phase 7 (in progress)** — draining what was left, which by then was a
+**Phase 8 (done)** — more draining, and two more defects.
+
+`ImageResourceHandler.check_resource` called `get_mimetype` on whatever
+`storage.get()` returned after `exists()` had said yes. A storage that says
+yes and then hands back `None` produced a 500; it now answers 404, which is
+what the `else` branch already did for a missing image.
+
+`http_loader` passed a `datetime` as `HTTPResponse(start_time=...)`, which
+tornado documents and types as a float from `time.time()`. The loader keeps
+using the datetime for its own metric, and converts with `.timestamp()` for
+tornado.
+
+The rest were the same construction-artifact pattern in `Transformer`
+(`focal_points`, `target_width`, `target_height`, all filled by methods
+that run first), guards where a buffer or an optional storage really can be
+absent, and `GifEngine` raising its own `GifSicleError` when the
+`gifsicle --info` output does not match the expected shape instead of an
+`AttributeError` on `None`.
+
+**Phase 7 (done)** — draining what was left, which by then was a
 long tail rather than any one cause. Three real defects came out of it:
 
 - `filters:upscale()` returned **HTTP 500** on any URL asking for the

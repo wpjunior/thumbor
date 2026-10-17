@@ -1205,7 +1205,7 @@ class BaseHandler(tornado.web.RequestHandler):
 
         return fetch_result
 
-    async def get_blacklist_contents(self):
+    async def get_blacklist_contents(self) -> str:
         filename = "blacklist.txt"
 
         exists = await self.context.modules.storage.exists(filename)
@@ -1324,6 +1324,12 @@ class ImageApiHandler(ContextHandler):
 
         return True
 
-    async def write_file(self, file_id, body):
+    async def write_file(self, file_id: str, body: bytes) -> None:
         storage = self.context.modules.upload_photo_storage
+
+        if storage is None:
+            raise RuntimeError(
+                "UPLOAD_PHOTO_STORAGE must be configured to accept uploads."
+            )
+
         await storage.put(file_id, body)

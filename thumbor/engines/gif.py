@@ -74,11 +74,18 @@ class Engine(PILEngine):
         self._is_multiple = False
 
         result = self.run_gifsicle("--info").decode("utf-8")
+
         size = GIFSICLE_SIZE_REGEX.search(result)
+        count = GIFSICLE_IMAGE_COUNT_REGEX.search(result)
+
+        if size is None or count is None:
+            raise GifSicleError(
+                "Could not read the image dimensions or frame count from "
+                f"gifsicle --info output: {result}"
+            )
+
         width, height = size.groups()[0].split("x")
         self.image_size = [int(width), int(height)]
-
-        count = GIFSICLE_IMAGE_COUNT_REGEX.search(result)
         self.frame_count = int(count.groups()[0])
 
     def load(self, buffer, extension):

@@ -37,18 +37,20 @@ class ResultStorageResult(LoaderResult):
         Retrieves mime metadata if available
         :return:
         """
+        if "ContentType" in self.metadata:
+            return self.metadata["ContentType"]
+
         return (
-            self.metadata["ContentType"]
-            if "ContentType" in self.metadata
-            else BaseEngine.get_mimetype(self.buffer)
+            BaseEngine.get_mimetype(self.buffer)
+            if self.buffer is not None
+            else None
         )
 
     def __len__(self) -> int:
-        return (
-            self.metadata["ContentLength"]
-            if "ContentLength" in self.metadata
-            else len(self.buffer)
-        )
+        if "ContentLength" in self.metadata:
+            return self.metadata["ContentLength"]
+
+        return len(self.buffer) if self.buffer is not None else 0
 
 
 class BaseStorage:
