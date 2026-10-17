@@ -27,6 +27,9 @@ class BlacklistHandler(ContextHandler):
     # ty: ignore[invalid-method-override]
     async def put(self):
         blacklist = await self.get_blacklist_contents()
+        # tornado declares request.query with a legacy type comment over a
+        # None class attribute, which ty reads as None | Unknown | str.
+        # ty: ignore[unsupported-operator]
         blacklist += self.request.query + "\n"
         logger.debug("Adding to blacklist: %s", self.request.query)
         await self.context.modules.storage.put(

@@ -156,18 +156,13 @@ output-format = "concise"
 # of this list is how a phase is finished: drive it to zero, then delete the
 # line and it becomes an error from then on.
 [tool.ty.rules]
-unresolved-attribute = "warn"
-invalid-argument-type = "warn"
-invalid-assignment = "warn"
-unsupported-operator = "warn"
+# All that is left. The first two are the deprecated datetime.utcnow calls
+# and the storage whose last_updated is awaited although it is a plain def;
+# both need a behaviour change, so they are tracked in docs/typing.md under
+# open findings rather than annotated away.
 deprecated = "warn"
-no-matching-overload = "warn"
-invalid-return-type = "warn"
-unused-type-ignore-comment = "warn"
-unresolved-import = "warn"
-not-subscriptable = "warn"
-not-iterable = "warn"
 invalid-await = "warn"
+unresolved-attribute = "warn"
 
 [tool.cibuildwheel]
 build = "cp31[012345]-*"
