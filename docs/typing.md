@@ -25,7 +25,7 @@ the package itself is clean.
 ## Where the diagnostics come from
 
 The count started at **419** (ty 0.0.89, `thumbor/` only), was **375**
-after phase 1 and is **369** after phase 2. The number moves slowly on
+after phase 1, **369** after phase 2 and is **323** after phase 3. The number moves slowly on
 purpose: annotating a module often *reveals* errors that were previously
 hidden behind `Unknown`, so a phase can fix real problems while the total
 barely moves — or rises.
@@ -37,7 +37,7 @@ and `BaseEngine` each initialise their collaborators to `None`, so ty infers
 and the errors only clear when a link is annotated — fixing `Context` alone
 moved the total by 25.
 
-**82 of the 369 are a single problem**: the reachable `None` on
+**82 of those are a single problem**: the reachable `None` on
 `BaseFilter.engine` (see the open findings below). Annotating `engine`
 honestly as `BaseEngine | None` is what makes them visible — they were
 there before, hidden behind `Unknown`. They clear in one go whenever that
@@ -133,12 +133,30 @@ construction artifact as `config` and `server`. Making it non-optional
 removed 25 diagnostics in `filters/frame.py` and elsewhere, and introduced
 no `redundant-condition` warnings on the existing `if self.modules` guards.
 
-**Phase 3** — `Protocol` definitions for the duck-typed plugin points that
-are modules rather than classes: loaders (`async def load(context, url)`),
-handler lists (`def get_handlers(context)`) and url signers. Plus attribute
-annotations on `Importer`, whose attributes are assigned through `setattr`
-and so are invisible to the checker — this is what the two
-`call-non-callable` diagnostics in `handlers/imaging.py` are pointing at.
+**Phase 3 (done)** — `Protocol` definitions for the plugin points that are
+modules rather than classes, plus attribute annotations on `Importer` and
+`ContextImporter`.
+
+`LoaderModule` lives in `thumbor/loaders/__init__.py` and
+`HandlerListModule` in `thumbor/handler_lists/__init__.py`. `UrlSigner`
+had to go in `thumbor/importer.py` instead of beside the others, because
+`thumbor/url_signers/__init__.py` replaces itself in `sys.modules` with
+libthumbor's package and so cannot host a type. All three declare their
+members as `@staticmethod`, which is what makes a Protocol match a module
+rather than an instance.
+
+`Importer` and `ContextImporter` assign their attributes through `setattr`,
+so declaring them is the only way the checker can see them. Which ones are
+optional is not a judgement call here: `config.validates_presence_of`
+names exactly those the config guarantees, and those are declared
+always-present. The rest keep their `None`. This is what the two
+`call-non-callable` diagnostics in `handlers/imaging.py` were pointing at,
+and they are gone.
+
+Phase 3 also removed three now-redundant `cast()` calls in the handler
+lists — `config.HEALTHCHECK_ROUTE` and friends have real types since the
+`config.pyi` landed — and `.flake8` now ignores `E704`, which fires on the
+`def f() -> T: ...` bodies black writes for Protocol members.
 
 **Phase 4** — `BaseStorage` (both of them: `storages/` and
 `result_storages/` define distinct classes under the same name) and
@@ -159,6 +177,16 @@ change, and should be fixed on their own:
 - `RequestParameters.filters` defaults to `[]` but arrives from the URL as a
   `str`, and is consumed with `.split("):")`. The annotation records the
   union rather than papering over it.
+- `BaseEngine.read(self, extension, quality)` takes no defaults, but every
+  subclass declares `read(self, extension=None, quality=None)` and every
+  caller invokes `read()` with no arguments. The base signature is stricter
+  than its implementations, which is both one of the 17
+  `invalid-method-override` diagnostics and the `missing-argument` one in
+  `filters/frame.py`. Phase 5 territory, since it touches `BaseEngine`.
+- `Importer.import_item` declares `config_key=None`, but it cannot do
+  anything without it — all 19 call sites pass it and the method would
+  raise on `None`. Left as is, since the signature is public; the two
+  resulting diagnostics are suppressed where they occur.
 - `BaseFilter.run()` assigns `None` to `self.engine` when there is no
   engine, which makes filters such as `background_color` raise
   `AttributeError`. Unreachable in a running server, since `context.modules`

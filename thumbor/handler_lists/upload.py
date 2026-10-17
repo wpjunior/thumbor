@@ -7,15 +7,20 @@
 # http://www.opensource.org/licenses/mit-license
 # Copyright (c) 2011 globo.com thumbor@googlegroups.com
 
-from typing import Any, cast
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from thumbor.handler_lists import HandlerList
 from thumbor.handlers.image_resource import ImageResourceHandler
 from thumbor.handlers.upload import ImageUploadHandler
 
+if TYPE_CHECKING:
+    from thumbor.context import Context
 
-def get_handlers(context: Any) -> HandlerList:
-    is_upload_enabled = cast(bool, context.config.UPLOAD_ENABLED)
+
+def get_handlers(context: Context) -> HandlerList:
+    is_upload_enabled = context.config.UPLOAD_ENABLED
     if not is_upload_enabled:
         return []
 

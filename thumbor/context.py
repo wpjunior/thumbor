@@ -17,15 +17,23 @@ from thumbor.metrics.logger_metrics import Metrics
 from thumbor.threadpool import ThreadPool
 
 if TYPE_CHECKING:
-    from types import TracebackType
+    from types import ModuleType, TracebackType
+    from typing import Sequence
 
     from tornado.httputil import HTTPServerRequest
     from tornado.web import RequestHandler
 
     from thumbor.config import Config
-    from thumbor.importer import Importer
+    from thumbor.detectors import BaseDetector
+    from thumbor.engines import BaseEngine
+    from thumbor.filters import BaseFilter
+    from thumbor.importer import Importer, UrlSigner
+    from thumbor.loaders import LoaderModule
     from thumbor.metrics import BaseMetrics
+    from thumbor.optimizers import BaseOptimizer
     from thumbor.point import FocalPoint
+    from thumbor.result_storages import BaseStorage as BaseResultStorage
+    from thumbor.storages import BaseStorage
 
 
 def _split_http_header(value, delimiter):
@@ -477,21 +485,39 @@ class RequestParameters:  # pylint: disable=too-few-public-methods,too-many-inst
 
 
 class ContextImporter:  # pylint: disable=too-few-public-methods,too-many-instance-attributes
+    # These mirror Importer: the ones the config demands are always built,
+    # so they are declared as always-present and their None initialisers
+    # are suppressed. See the rule in docs/typing.md.
+    engine: BaseEngine
+    gif_engine: BaseEngine
+    storage: BaseStorage
+    loader: LoaderModule
+    url_signer: type[UrlSigner]
+    detectors: Sequence[type[BaseDetector]]
+    filters: Sequence[type[BaseFilter]]
+    optimizers: Sequence[type[BaseOptimizer]]
+
+    result_storage: BaseResultStorage | None
+    upload_photo_storage: BaseStorage | None
+    compatibility_legacy_loader: ModuleType | None
+    compatibility_legacy_storage: BaseStorage | None
+    compatibility_legacy_result_storage: BaseStorage | None
+
     def __init__(self, context: Context, importer: Importer) -> None:
         self.context = context
         self.importer = importer
 
-        self.engine = None
+        self.engine = None  # ty: ignore[invalid-assignment]
 
         if importer.engine:
             self.engine = importer.engine(context)
 
-        self.gif_engine = None
+        self.gif_engine = None  # ty: ignore[invalid-assignment]
 
         if importer.gif_engine:
             self.gif_engine = importer.gif_engine(context)
 
-        self.storage = None
+        self.storage = None  # ty: ignore[invalid-assignment]
 
         if importer.storage:
             self.storage = importer.storage(context)
