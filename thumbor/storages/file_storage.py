@@ -7,12 +7,15 @@
 # http://www.opensource.org/licenses/mit-license
 # Copyright (c) 2011 globo.com thumbor@googlegroups.com
 
+from __future__ import annotations
+
 import hashlib
 import os
 from datetime import datetime
 from json import dumps, loads
 from os.path import dirname, exists, getmtime, splitext
 from shutil import move
+from typing import Any
 from uuid import uuid4
 
 from thumbor import storages
@@ -20,7 +23,7 @@ from thumbor.utils import logger
 
 
 class Storage(storages.BaseStorage):
-    async def put(self, path, file_bytes):
+    async def put(self, path: str, file_bytes: bytes) -> str | None:
         file_abspath = self.path_on_filesystem(path)
         temp_abspath = f"{file_abspath}.{str(uuid4()).replace('-', '')}"
         file_dir_abspath = dirname(file_abspath)
@@ -37,7 +40,7 @@ class Storage(storages.BaseStorage):
 
         return path
 
-    async def put_crypto(self, path):
+    async def put_crypto(self, path: str) -> str | None:
         if not self.context.config.STORES_CRYPTO_KEY_FOR_EACH_IMAGE:
             return
 
@@ -55,10 +58,12 @@ class Storage(storages.BaseStorage):
         crypto_path = f"{splitext(file_abspath)[0]}.txt"
         temp_abspath = f"{crypto_path}.{str(uuid4()).replace('-', '')}"
         with open(temp_abspath, "wb") as _file:
-            try:
-                security_key = self.context.server.security_key.encode()
-            except (UnicodeDecodeError, AttributeError):
-                security_key = self.context.server.security_key
+            # The key is a str when it comes from config and bytes when it
+            # was read from a key file. The guard above already rejected an
+            # empty one.
+            security_key = self.context.server.security_key
+            if isinstance(security_key, str):
+                security_key = security_key.encode()
             _file.write(security_key)
 
         move(temp_abspath, crypto_path)
@@ -70,7 +75,7 @@ class Storage(storages.BaseStorage):
 
         return file_abspath
 
-    async def put_detector_data(self, path, data):
+    async def put_detector_data(self, path: str, data: Any) -> str | None:
         file_abspath = self.path_on_filesystem(path)
 
         path = f"{splitext(file_abspath)[0]}.detectors.txt"
@@ -86,7 +91,7 @@ class Storage(storages.BaseStorage):
 
         return file_abspath
 
-    async def get(self, path):
+    async def get(self, path: str) -> bytes | None:
         abs_path = self.path_on_filesystem(path)
 
         resource_available = await self.exists(
@@ -98,7 +103,7 @@ class Storage(storages.BaseStorage):
         with open(self.path_on_filesystem(path), "rb") as source_file:
             return source_file.read()
 
-    async def get_crypto(self, path):
+    async def get_crypto(self, path: str) -> str | None:
         file_abspath = self.path_on_filesystem(path)
         crypto_file = f"{splitext(file_abspath)[0]}.txt"
 
@@ -108,7 +113,7 @@ class Storage(storages.BaseStorage):
         with open(crypto_file, "r", encoding="utf-8") as crypto_f:
             return crypto_f.read()
 
-    async def get_detector_data(self, path):
+    async def get_detector_data(self, path: str) -> Any | None:
         file_abspath = self.path_on_filesystem(path)
         path = f"{splitext(file_abspath)[0]}.detectors.txt"
 
@@ -120,25 +125,25 @@ class Storage(storages.BaseStorage):
         with open(path, "r", encoding="utf-8") as detector_file:
             return loads(detector_file.read())
 
-    def path_on_filesystem(self, path):
+    def path_on_filesystem(self, path: str) -> str:
         digest = hashlib.sha1(path.encode("utf-8")).hexdigest()
         root_path = self.context.config.FILE_STORAGE_ROOT_PATH.rstrip("/")
         return f"{root_path}/{digest[:2]}/{digest[2:]}"
 
-    async def exists(
-        self, path, path_on_filesystem=None
-    ):  # pylint: disable=arguments-differ
+    async def exists(  # pylint: disable=arguments-differ
+        self, path: str, path_on_filesystem: str | None = None
+    ) -> bool:
         if path_on_filesystem is None:
             path_on_filesystem = self.path_on_filesystem(path)
         return os.path.exists(path_on_filesystem) and not self.__is_expired(
             path_on_filesystem
         )
 
-    async def remove(self, path):
+    async def remove(self, path: str) -> None:
         n_path = self.path_on_filesystem(path)
         return os.remove(n_path)
 
-    def __is_expired(self, path):
+    def __is_expired(self, path: str) -> bool:
         if self.context.config.STORAGE_EXPIRATION_SECONDS is None:
             return False
         timediff = datetime.now() - datetime.fromtimestamp(getmtime(path))

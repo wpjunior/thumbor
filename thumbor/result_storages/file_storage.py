@@ -7,6 +7,8 @@
 # http://www.opensource.org/licenses/mit-license
 # Copyright (c) 2011 globo.com thumbor@googlegroups.com
 
+from __future__ import annotations
+
 import hashlib
 from datetime import datetime
 from os.path import abspath, dirname, exists, getmtime, isdir, isfile, join
@@ -30,7 +32,7 @@ class Storage(BaseStorage):
     PATH_FORMAT_VERSION = "v2"
 
     @property
-    def is_auto_webp(self):
+    def is_auto_webp(self) -> bool:
         """Whether the request used the WebP variant in the legacy layout."""
         request = getattr(self.context, "request", None)
 
@@ -41,7 +43,7 @@ class Storage(BaseStorage):
             == "auto_webp"
         )
 
-    async def put(self, image_bytes):
+    async def put(self, image_bytes: bytes) -> str | None:
         file_abspath = self.normalize_path(self.context.request.url)
         if not self.validate_path(file_abspath):
             logger.warning(
@@ -64,7 +66,7 @@ class Storage(BaseStorage):
 
         move(temp_abspath, file_abspath)
 
-    async def get(self):
+    async def get(self) -> ResultStorageResult | None:
         path = self.context.request.url
         file_abspath = self.normalize_path(path)
 
@@ -119,12 +121,12 @@ class Storage(BaseStorage):
 
         return result
 
-    def validate_path(self, path):
+    def validate_path(self, path: str) -> bool:
         return abspath(path).startswith(
             self.context.config.RESULT_STORAGE_FILE_STORAGE_ROOT_PATH
         )
 
-    def normalize_path(self, path):
+    def normalize_path(self, path: str) -> str:
         digest = hashlib.sha1(unquote(path).encode("utf-8")).hexdigest()
         root_path = (
             self.context.config.RESULT_STORAGE_FILE_STORAGE_ROOT_PATH.rstrip(
@@ -135,7 +137,7 @@ class Storage(BaseStorage):
 
         return f"{root_path}/{prefix}/{digest[:2]}/{digest[2:4]}/{digest[4:]}"
 
-    def get_auto_image_format_cache_key(self):
+    def get_auto_image_format_cache_key(self) -> str | None:
         request = getattr(self.context, "request", None)
 
         if request is None:
@@ -149,7 +151,7 @@ class Storage(BaseStorage):
 
         return get_auto_image_format_cache_key(self.context.config, request)
 
-    def can_migrate_legacy_path(self):
+    def can_migrate_legacy_path(self) -> bool:
         request = getattr(self.context, "request", None)
 
         if request is None:
@@ -161,7 +163,7 @@ class Storage(BaseStorage):
         legacy_cache_key = "auto_webp" if self.is_auto_webp else None
         return self.get_auto_image_format_cache_key() == legacy_cache_key
 
-    def normalize_path_legacy(self, path):
+    def normalize_path_legacy(self, path: str) -> str:
         path = unquote(path)
         path_segments = [
             self.context.config.RESULT_STORAGE_FILE_STORAGE_ROOT_PATH.rstrip(
@@ -177,11 +179,11 @@ class Storage(BaseStorage):
         normalized_path = join(*path_segments).replace("http://", "")
         return normalized_path
 
-    def partition(self, path_raw):
+    def partition(self, path_raw: str) -> str:
         path = path_raw.lstrip("/")
         return join("".join(path[0:2]), "".join(path[2:4]))
 
-    def is_expired(self, path):
+    def is_expired(self, path: str) -> bool:
         expire_in_seconds = self.context.config.get(
             "RESULT_STORAGE_EXPIRATION_SECONDS", None
         )
@@ -193,7 +195,7 @@ class Storage(BaseStorage):
         return timediff.total_seconds() > expire_in_seconds
 
     @deprecated("Use result's last_modified instead")
-    def last_updated(self):
+    def last_updated(self) -> datetime | bool:
         path = self.context.request.url
         file_abspath = self.normalize_path(path)
         if not self.validate_path(file_abspath):

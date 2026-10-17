@@ -317,6 +317,11 @@ class RequestParameters:  # pylint: disable=too-few-public-methods,too-many-inst
     # transformer, so they are declared rather than inferred.
     trim_pos: str
     trim_tolerance: int
+    # ImagingHandler always passes the tornado request, and
+    # _set_request_headers then sets url from its path. The None default is
+    # only reached by the bare RequestParameters() that BaseHandler.on_finish
+    # builds to collect metrics, which never reads the url.
+    url: str
 
     def __init__(  # pylint: disable=too-many-positional-arguments
         self,
@@ -407,7 +412,7 @@ class RequestParameters:  # pylint: disable=too-few-public-methods,too-many-inst
 
         self.filters = filters
         self.image_url = image
-        self.url = url
+        self.url = url  # ty: ignore[invalid-assignment]
         self.detection_error = None
         self.quality = quality
         self.buffer = None
@@ -496,6 +501,11 @@ class ContextImporter:  # pylint: disable=too-few-public-methods,too-many-instan
     detectors: Sequence[type[BaseDetector]]
     filters: Sequence[type[BaseFilter]]
     optimizers: Sequence[type[BaseOptimizer]]
+
+    # Set by MixedStorage alongside the Importer attributes above.
+    file_storage: BaseStorage
+    crypto_storage: BaseStorage
+    detector_storage: BaseStorage
 
     result_storage: BaseResultStorage | None
     upload_photo_storage: BaseStorage | None

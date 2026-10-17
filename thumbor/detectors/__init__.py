@@ -7,7 +7,14 @@
 # http://www.opensource.org/licenses/mit-license
 # Copyright (c) 2011 globo.com thumbor@googlegroups.com
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Sequence
+
 from thumbor.utils import logger
+
+if TYPE_CHECKING:
+    from thumbor.context import Context
 
 try:
     import cv2  # noqa
@@ -19,7 +26,12 @@ except ImportError:
 
 
 class BaseDetector:
-    def __init__(self, context, index, detectors):
+    def __init__(
+        self,
+        context: Context,
+        index: int,
+        detectors: Sequence[type[BaseDetector]],
+    ) -> None:
         self.context = context
         self.index = index
         self.detectors = detectors
@@ -36,10 +48,10 @@ class BaseDetector:
 
         return False
 
-    async def detect(self):
+    async def detect(self) -> None:
         raise NotImplementedError()
 
-    async def next(self):
+    async def next(self) -> None:
         if not self.detectors or self.index > len(self.detectors) - 2:
             return
 

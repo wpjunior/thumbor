@@ -86,6 +86,12 @@ class Importer:  # pylint: disable=too-many-instance-attributes
     error_handler_class: Any | None
     # Assigned from outside, by server.py, once the class is resolved.
     error_handler: Any
+    # Injected on demand by MixedStorage, which calls import_item with its
+    # own config keys rather than going through import_modules.
+    file_storage: type[BaseStorage]
+    crypto_storage: type[BaseStorage]
+    detector_storage: type[BaseStorage]
+
     compatibility_legacy_loader: ModuleType | None
     compatibility_legacy_storage: type[BaseStorage] | None
     compatibility_legacy_result_storage: type[BaseStorage] | None

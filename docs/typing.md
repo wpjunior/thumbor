@@ -25,7 +25,8 @@ the package itself is clean.
 ## Where the diagnostics come from
 
 The count started at **419** (ty 0.0.89, `thumbor/` only), was **375**
-after phase 1, **369** after phase 2 and is **323** after phase 3. The number moves slowly on
+after phase 1, **369** after phase 2, **323** after phase 3 and is **316**
+after phase 4. The number moves slowly on
 purpose: annotating a module often *reveals* errors that were previously
 hidden behind `Unknown`, so a phase can fix real problems while the total
 barely moves — or rises.
@@ -158,9 +159,19 @@ lists — `config.HEALTHCHECK_ROUTE` and friends have real types since the
 `config.pyi` landed — and `.flake8` now ignores `E704`, which fires on the
 `def f() -> T: ...` bodies black writes for Protocol members.
 
-**Phase 4** — `BaseStorage` (both of them: `storages/` and
-`result_storages/` define distinct classes under the same name) and
-`BaseDetector`.
+**Phase 4 (done)** — both `BaseStorage` classes and `BaseDetector`, with
+their implementations. The two storage bases now carry docstrings saying
+which is which, since `storages/` and `result_storages/` define distinct
+classes under the same name.
+
+Declaring the storage contracts is what surfaced the `MixedStorage`
+findings below. It also let three annotations be corrected:
+`get_detection_offset` was declared `Dict[str, int]` in both detectors but
+returns floats, and `FocalPoint.from_square` had been annotated with `int`
+parameters in phase 1 although `CascadeLoaderDetector.detect` passes it
+`int + float`. `RequestParameters.url` is now declared non-optional, since
+`ImagingHandler` always passes the tornado request and
+`_set_request_headers` sets the url from its path.
 
 **Phase 5** — `BaseEngine` and `BaseHandler`, the two widest interfaces (43
 and 44 methods). Only then does ty become a CI gate and a pre-commit hook.
@@ -177,6 +188,21 @@ change, and should be fixed on their own:
 - `RequestParameters.filters` defaults to `[]` but arrives from the URL as a
   `str`, and is consumed with `.split("):")`. The annotation records the
   union rather than papering over it.
+- `MixedStorage.resolve_original_photo_path` delegates to
+  `self.file_storage.resolve_original_photo_path`, but no storage shipped
+  with thumbor defines that method, and unlike every other method on the
+  class it does not call `_init_file_storage()` first. It raises
+  `AttributeError` whichever way it is reached. Left as is because it is
+  public API; the diagnostic is suppressed where it occurs.
+- `result_storages/file_storage.last_updated()` returns `True` on both of
+  its failure paths and a `datetime` otherwise, and its only caller does
+  `result_last_modified.strftime(...)` — which would raise on the `True`.
+  The annotation records `datetime | bool` rather than hiding it. The same
+  caller also does `await` on `last_updated()`, which is a plain `def`, so
+  a result storage returning a real value there raises `TypeError` that the
+  surrounding `except NotImplementedError` does not catch. Unreachable with
+  the bundled file storage, whose `get()` returns a `ResultStorageResult`
+  and so takes the other branch.
 - `BaseEngine.read(self, extension, quality)` takes no defaults, but every
   subclass declares `read(self, extension=None, quality=None)` and every
   caller invokes `read()` with no arguments. The base signature is stricter

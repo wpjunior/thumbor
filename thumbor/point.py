@@ -69,10 +69,10 @@ class FocalPoint:
     @classmethod
     def from_square(  # pylint: disable=too-many-positional-arguments
         cls,
-        x: int,  # pylint: disable=invalid-name
-        y: int,  # pylint: disable=invalid-name
-        width: int,
-        height: int,
+        x: float,  # pylint: disable=invalid-name
+        y: float,  # pylint: disable=invalid-name
+        width: float,
+        height: float,
         origin: str = "detection",
     ) -> FocalPoint:
         center_x = x + width // 2
