@@ -22,6 +22,7 @@ from typing import (
     Iterable,
     Pattern,
     Protocol,
+    TypedDict,
 )
 
 if TYPE_CHECKING:
@@ -67,15 +68,22 @@ PHASE_PRE_LOAD = "pre-load"
 PHASE_AFTER_LOAD = "after-load"
 
 
-class RunnableMethod(Protocol):
-    """A filter method after filter_method has decorated it.
+class FilterData(TypedDict):
+    """What filter_method records about the method it decorates.
 
-    The decorator attaches filter_data to the wrapper, which pre_compile
-    then reads to build the filter's regex, so the attribute is part of the
-    contract rather than an implementation detail.
+    pre_compile and compile_regex read this back to build the filter's
+    regex, so it is part of the contract between the two.
     """
 
-    filter_data: dict[str, Any]
+    name: str
+    params: tuple[Any, ...]
+    defaults: list[Any] | None
+
+
+class RunnableMethod(Protocol):
+    """A filter method after filter_method has decorated it."""
+
+    filter_data: FilterData
 
     def __call__(self, *args: Any) -> Awaitable[Any]: ...
 
@@ -219,7 +227,7 @@ class BaseFilter:
         return filter_data["name"]
 
     @classmethod
-    def compile_regex(cls, filter_data: dict[str, Any]) -> None:
+    def compile_regex(cls, filter_data: FilterData) -> None:
         params = filter_data["params"]
         defaults = filter_data.get("defaults", None)
         regexes = []

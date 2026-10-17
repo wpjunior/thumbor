@@ -87,6 +87,31 @@ in place. We decide per attribute, rather than applying one blanket policy:
 Never suppress a reachable `None` just to lower the count. The checker
 earning its keep matters more than the number.
 
+## Any
+
+`Any` switches the checker off for whatever it touches, so each one needs a
+reason. `tests/test_config_stub.py` enforces that no config option is left
+as a bare `Any`, and the ones that remain in the package fall into three
+groups:
+
+- **Libraries with no annotations**, where a more specific type would be
+  `Unknown` anyway: the OpenCV cascade classifier, the statsd client, and
+  the error handler class, which is third-party by design.
+- **Deliberate dynamism**: `import_class` returns whatever the dotted path
+  names, `validate_fn` is handed any class to vet, and a filter's parsed
+  `params` are splatted into methods with their own concrete signatures.
+- **`BaseEngine.image` and the methods that produce it.** The base class is
+  deliberately agnostic about what a concrete engine works on — a
+  `PIL.Image` for `PILEngine`, a dict of operations for `JSONEngine` — so
+  narrowing it here would mean committing the base to Pillow.
+
+Anything else is worth replacing with a real type. Two came out of that:
+`FocalPointDict` describes what `FocalPoint.to_dict` writes into detector
+storage and the JSON engine's output, and `FilterData` describes what
+`filter_method` records for `compile_regex` to read back. `from_dict` takes
+a loose `Mapping` on purpose, since it reads JSON that an older thumbor may
+have written.
+
 ## Conventions
 
 - Prefer `X | None` over `Optional[X]`, and builtin generics (`dict[str, Any]`)
@@ -108,9 +133,13 @@ stub; run it with `make config-stub` after adding, removing or renaming an
 option. `tests/test_config_stub.py` fails when the checked-in stub is stale.
 
 With the stub in place, `context.config.MAX_WIDTH` resolves to `int` and
-`context.config.FILTERS` to `list[str]`. An option whose default is `None`
-has no inferable type and widens to `Any`; refining those 31 by hand is
-future work. Note that the stub gives options *types* but does not catch
+`context.config.FILTERS` to `list[str]`. A default of `None` or an empty
+list says nothing about the option's type, so those are listed in
+`TYPE_OVERRIDES` in the generator, each derived from how thumbor actually
+reads the option and carrying a comment with that evidence. Two tests keep
+that honest: no override may name an option that no longer exists, and no
+override may describe a default that the generator could have inferred on
+its own. Note that the stub gives options *types* but does not catch
 typos, because derpconf's `__getattr__` accepts any name.
 
 The generator runs in a subprocess from the test, deliberately: derpconf
@@ -197,6 +226,10 @@ parameters in phase 1 although `CascadeLoaderDetector.detect` passes it
 `int + float`. `RequestParameters.url` is now declared non-optional, since
 `ImagingHandler` always passes the tornado request and
 `_set_request_headers` sets the url from its path.
+
+**Phase 10 (done)** — replaced `Any` with real types wherever it was
+standing in for something knowable. 129 occurrences across the package
+became 82, and the 37 config options that were `Any` became 2.
 
 **Phase 9 (done)** — took the count to the five diagnostics that cannot be
 fixed without changing behaviour, and promoted nine rules out of the warn

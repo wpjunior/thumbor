@@ -11,10 +11,11 @@ from __future__ import annotations
 
 import os
 from os.path import exists
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from thumbor.context import Context
+    from thumbor.point import FocalPointDict
 
 
 class BaseStorage:
@@ -39,7 +40,9 @@ class BaseStorage:
         """
         raise NotImplementedError()
 
-    async def put_detector_data(self, path: str, data: Any) -> str | None:
+    async def put_detector_data(
+        self, path: str, data: list[FocalPointDict]
+    ) -> str | None:
         """
         :returns: The stored path, when the storage reports one.
         """
@@ -48,7 +51,9 @@ class BaseStorage:
     async def get_crypto(self, path: str) -> str | None:
         raise NotImplementedError()
 
-    async def get_detector_data(self, path: str) -> Any | None:
+    async def get_detector_data(
+        self, path: str
+    ) -> list[FocalPointDict] | None:
         raise NotImplementedError()
 
     async def get(self, path: str) -> bytes | None:
