@@ -134,8 +134,14 @@ class ImagingHandler(ContextHandler):
 
         return await self.execute_image_operations()
 
+    # tornado types its verb handlers as (*args: str, **kwargs: str);
+    # thumbor declares the concrete arguments its routes capture.
+    # ty: ignore[invalid-method-override]
     async def get(self, **kw):
         return await self.check_image(kw)
 
+    # tornado types its verb handlers as (*args: str, **kwargs: str);
+    # thumbor declares the concrete arguments its routes capture.
+    # ty: ignore[invalid-method-override]
     async def head(self, **kw):
         return await self.check_image(kw)

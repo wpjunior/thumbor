@@ -11,6 +11,7 @@ import mimetypes
 import random
 from io import BytesIO
 from os.path import dirname, join, realpath
+from typing import Any
 from unittest import mock
 from urllib.parse import urlencode
 
@@ -248,7 +249,10 @@ class FilterTestCase(TestCase):
     def get_ssim(actual, expected):
         return get_ssim(actual, expected)
 
-    def debug(self, image):  # pylint: disable=arguments-differ
+    # Shadows unittest.TestCase.debug, which takes no arguments. Renaming
+    # it would break the filter tests that call it.
+    # ty: ignore[invalid-method-override]
+    def debug(self, image: Any) -> None:  # pylint: disable=arguments-differ
         image = Image.fromarray(image)
         path = f"/tmp/debug_image_{random.randint(1, 10000)}.jpg"
         image.save(path, "JPEG")

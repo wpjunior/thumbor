@@ -7,6 +7,8 @@
 # http://www.opensource.org/licenses/mit-license
 # Copyright (c) 2011 globo.com thumbor@googlegroups.com
 
+from __future__ import annotations
+
 import json
 
 from thumbor.engines import BaseEngine
@@ -133,7 +135,9 @@ class JSONEngine(BaseEngine):
         if can_convert:
             self.operations.append({"type": "auto_png_to_jpg_conversion"})
 
-    def read(self, extension, quality):
+    def read(
+        self, extension: str | None = None, quality: int | None = None
+    ) -> bytes:
         target_width, target_height = self.get_target_dimensions()
         width, height = self.engine.size
         thumbor_json = {

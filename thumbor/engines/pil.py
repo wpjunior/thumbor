@@ -99,7 +99,13 @@ class Engine(BaseEngine):
         if color == "transparent":
             color = None
         elif color == "auto":
-            color = Filter.get_median_color(self.context.modules)
+            # Calls an unbound instance method with ContextImporter as
+            # self: both it and Filter happen to expose `.engine`, which
+            # is all get_median_color touches. See docs/typing.md.
+            modules = self.context.modules
+            color = Filter.get_median_color(
+                modules  # ty: ignore[invalid-argument-type]
+            )
             color = f"#{color}"
 
         img = Image.new("RGBA", size, color)
@@ -132,7 +138,9 @@ class Engine(BaseEngine):
         if self._webp_durations is not None:
             # Use the regular encoder for WebP quality and metadata options.
             # Keep the existing read_multiple contract for other engines/GIFs.
-            self.read = read
+            # BaseEngine.wrap swaps these for per-instance callables, so
+            # the attribute and the method of the same name coexist.
+            self.read = read  # ty: ignore[invalid-assignment]
             self.rotate = multiple_engine.do_many("rotate")
             for frame_engine in multiple_engine.frame_engines:
                 frame_engine.icc_profile = self.icc_profile
@@ -311,6 +319,7 @@ class Engine(BaseEngine):
             (int(left), int(top), int(right), int(bottom))
         )
 
+    # ty: ignore[invalid-method-override]
     def rotate(self, degrees):
         # PIL rotates counter clockwise
 
@@ -351,6 +360,7 @@ class Engine(BaseEngine):
             self.image.info["transparency"] = histogram.index(most_common)
 
     # TODO: Refactor this
+    # ty: ignore[invalid-method-override]
     def read(  # noqa
         self, extension=None, quality=None
     ):  # noqa pylint: disable=too-many-statements,too-many-branches

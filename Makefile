@@ -10,7 +10,7 @@ UV_RUN_TESTS = $(UV_RUN_DEV) --extra all
 	bootstrap-uv build build_docs ci_test compile_ext coverage docs flake \
 	config-stub format isort integration integration_run int lcov pint \
 	pintegration pre-commit publish pylint run run-prod sequential-unit \
-	setup setup-ci setup_docs test typecheck unit
+	setup setup-ci setup_docs test typecheck typecheck-ci unit
 
 OS := $(shell uname)
 
@@ -100,9 +100,8 @@ pylint: compile_ext
 config-stub:
 	@$(UV_RUN_TESTS) python scripts/generate_config_stub.py
 
-# Reporting only: thumbor is being annotated incrementally, so this never
-# fails the build and is deliberately absent from `test` and from CI. See
-# docs/typing.md for the roadmap and for when it becomes a gate.
+# Reports everything, including the rules thumbor still owes work on, and
+# never fails. Use typecheck-ci for the gate. See docs/typing.md.
 typecheck:
 	@out="$$($(UV_RUN_TESTS) ty check --exit-zero 2>&1)"; \
 	echo "$$out"; \
@@ -111,6 +110,12 @@ typecheck:
 	echo "$$out" \
 		| sed -nE 's/^[^ ]+ (error|warning)\[([a-z-]+)\].*/\2/p' \
 		| sort | uniq -c | sort -rn
+
+# The gate: fails on the error-level rules, which are the ones already at
+# zero, while the remaining backlog stays as warnings. Driving a warn rule
+# in pyproject.toml to zero and deleting its line promotes it to an error.
+typecheck-ci:
+	@$(UV_RUN_TESTS) ty check --exit-zero-on-warning
 
 setup_docs:
 	@$(UV) sync --locked --inexact --group docs

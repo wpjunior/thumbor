@@ -11,6 +11,7 @@ import datetime
 import functools
 import sys
 import traceback
+from typing import Any
 
 import pytz
 import tornado.web
@@ -93,6 +94,9 @@ def _has_explicit_format_filter(filters):
 
 
 class FetchResult:  # Data Object pylint: disable=too-few-public-methods
+    # Set by _fetch when the engine loaded nothing.
+    engine_error: str | None
+
     def __init__(  # pylint: disable=too-many-positional-arguments
         self,
         normalized=False,
@@ -110,9 +114,18 @@ class FetchResult:  # Data Object pylint: disable=too-few-public-methods
 
 
 class BaseHandler(tornado.web.RequestHandler):
-    url_locks = {}
+    url_locks: dict[str, Condition] = {}
 
-    def prepare(self):
+    # Set by ContextHandler.initialize. A handler whose initialize never
+    # ran has no context at all, which is why prepare and on_finish both
+    # probe for it before touching it.
+    context: Context
+
+    _response_ext: str | None
+    _response_length: int | None
+    _response_start: datetime.datetime
+
+    def prepare(self) -> None:
         super().prepare()
 
         if not hasattr(self, "context"):
@@ -124,9 +137,13 @@ class BaseHandler(tornado.web.RequestHandler):
         self._response_start = datetime.datetime.now()
         self.context.metrics.incr("response.count")
 
-    def on_finish(self):
+    def on_finish(self) -> None:
         super().on_finish()
-        self.context = getattr(self, "context", None)
+        # Creates the attribute as None when initialize never ran, so the
+        # check below can bail out instead of raising AttributeError.
+        self.context = getattr(  # ty: ignore[invalid-assignment]
+            self, "context", None
+        )
 
         if self.context is None:
             return
@@ -255,7 +272,10 @@ class BaseHandler(tornado.web.RequestHandler):
         )
 
         self.filters_runner = self.context.filters_factory.create_instances(
-            self.context, self.context.request.filters
+            self.context,
+            # request.filters is a str off the URL but defaults to a list;
+            # see the open findings in docs/typing.md.
+            self.context.request.filters,  # ty: ignore[invalid-argument-type]
         )
         # Apply all the filters from the PRE_LOAD phase
         # and call get_image() afterwards.
@@ -876,17 +896,24 @@ class BaseHandler(tornado.web.RequestHandler):
             return results.encode()
         return results
 
-    def _cleanup(self):
+    def _cleanup(self) -> None:
+        # Drops the request's references so the objects can be collected
+        # without waiting for the handler itself to go away. Every
+        # assignment here deliberately violates the declared type, which
+        # is why each one is suppressed rather than the types widened.
         self.context.request_handler = None
 
-        if hasattr(self.context, "request"):
-            self.context.request.engine = None
-        self.context.modules = None
-        self.context.filters_factory = None
-        self.context.metrics = None
-        self.context.thread_pool = None
-        self.context.transformer = None
-        self.context = None  # Handlers should not override __init__ pylint: disable=attribute-defined-outside-init
+        request = getattr(self.context, "request", None)
+        if request is not None:
+            request.engine = None
+        self.context.modules = None  # ty: ignore[invalid-assignment]
+        self.context.filters_factory = None  # ty: ignore[invalid-assignment]
+        self.context.metrics = None  # ty: ignore[invalid-assignment]
+        self.context.thread_pool = None  # ty: ignore[invalid-assignment]
+        self.context.transformer = None  # ty: ignore[invalid-assignment]
+        # Handlers should not override __init__
+        # pylint: disable-next=attribute-defined-outside-init
+        self.context = None  # ty: ignore[invalid-assignment]
 
     async def _write_results_to_client(self, results, content_type):
         max_age = self.context.config.MAX_AGE
@@ -1205,7 +1232,10 @@ class BaseHandler(tornado.web.RequestHandler):
 
 
 class ContextHandler(BaseHandler):
-    def initialize(self, context):
+    # tornado passes the route spec's kwargs through initialize; thumbor's
+    # routes always supply exactly `context`.
+    # ty: ignore[invalid-method-override]
+    def initialize(self, context: Context) -> None:
         self.context = Context(
             server=context.server,
             config=context.config,
@@ -1214,7 +1244,10 @@ class ContextHandler(BaseHandler):
         )
         self.context.metrics.initialize(self)
 
-    def log_exception(self, *exc_info):
+    # tornado declares (typ, value, tb); collected as a tuple here so it
+    # can be forwarded to format_exception and the error handler as is.
+    # ty: ignore[invalid-method-override]
+    def log_exception(self, *exc_info: Any) -> None:
         if isinstance(exc_info[1], tornado.web.HTTPError):
             # Delegate HTTPError's to the base class
             # We don't want these through normal exception handling
@@ -1240,7 +1273,12 @@ class ContextHandler(BaseHandler):
 # Base handler for Image API operations
 ##
 class ImageApiHandler(ContextHandler):
-    def validate(self, body):  # pylint: disable=arguments-renamed
+    # Unrelated to BaseHandler.validate, which checks a loader path: this
+    # one validates an upload body. The names collide by accident; see the
+    # open findings in docs/typing.md.
+    # ty: ignore[invalid-method-override]
+    # pylint: disable-next=arguments-renamed
+    def validate(self, body: bytes) -> bool:
         conf = self.context.config
         mime = BaseEngine.get_mimetype(body)
 

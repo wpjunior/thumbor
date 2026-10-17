@@ -22,11 +22,31 @@ ty is configured under `[tool.ty]` in `pyproject.toml`. It is scoped to the
 `thumbor` package for now; `tests/` and `integration_tests/` are added once
 the package itself is clean.
 
+## The gate
+
+```
+$ make typecheck-ci
+```
+
+This one does fail, but only on the rules that are already at zero. The
+rules thumbor still owes work on are set to `warn` in `[tool.ty.rules]`, and
+the command runs with `--exit-zero-on-warning`, so the existing backlog does
+not block anything while a newly introduced problem does.
+
+That is the mechanism for finishing a rule off: drive it to zero, delete its
+line from `[tool.ty.rules]`, and from then on it is an error that the gate
+catches. `invalid-method-override`, `call-non-callable`, `missing-argument`,
+`invalid-parameter-default`, `invalid-type-form` and `redundant-condition`
+went through this already.
+
+Wiring it into CI and pre-commit is the remaining step and has not been
+done; the workflow files are untouched.
+
 ## Where the diagnostics come from
 
 The count started at **419** (ty 0.0.89, `thumbor/` only), was **375**
-after phase 1, **369** after phase 2, **323** after phase 3 and is **316**
-after phase 4. The number moves slowly on
+after phase 1, **369** after phase 2, **323** after phase 3, **316** after
+phase 4 and is **155** after phase 5. The number moves slowly on
 purpose: annotating a module often *reveals* errors that were previously
 hidden behind `Unknown`, so a phase can fix real problems while the total
 barely moves — or rises.
@@ -38,11 +58,12 @@ and `BaseEngine` each initialise their collaborators to `None`, so ty infers
 and the errors only clear when a link is annotated — fixing `Context` alone
 moved the total by 25.
 
-**82 of those are a single problem**: the reachable `None` on
+**86 of the remaining 155 are a single problem**: the reachable `None` on
 `BaseFilter.engine` (see the open findings below). Annotating `engine`
 honestly as `BaseEngine | None` is what makes them visible — they were
 there before, hidden behind `Unknown`. They clear in one go whenever that
-bug is fixed, and no earlier.
+bug is fixed, and no earlier. `filters/` holds 106 diagnostics; 86 of them
+are this.
 
 ## Optional or not: the rule we follow
 
@@ -173,8 +194,28 @@ parameters in phase 1 although `CascadeLoaderDetector.detect` passes it
 `ImagingHandler` always passes the tornado request and
 `_set_request_headers` sets the url from its path.
 
-**Phase 5** — `BaseEngine` and `BaseHandler`, the two widest interfaces (43
-and 44 methods). Only then does ty become a CI gate and a pre-commit hook.
+**Phase 5 (done)** — `BaseEngine` and `BaseHandler`, the two widest
+interfaces, and the partial gate described above.
+
+The single biggest win was declaring `BaseHandler.context`. `on_finish` does
+`self.context = getattr(self, "context", None)` so that a handler whose
+`initialize` never ran can bail out instead of raising, and that one line
+was making ty infer `Any | None` for every `self.context` read in the
+handlers — 111 diagnostics from one assignment.
+
+`BaseEngine` got all 43 method signatures plus its attributes.
+`BaseEngine.read` gained the `extension=None, quality=None` defaults every
+subclass and every caller already assumed, which closed the
+`invalid-method-override` on `PILEngine.read` and the `missing-argument` in
+`filters/frame.py`. `json_engine.read` was aligned the same way.
+
+Three groups of diagnostics are suppressed rather than fixed, each with a
+comment at the site: `BaseEngine.wrap` replaces `read` and `rotate` with
+per-instance callables, so the attribute and the method of the same name
+coexist; tornado types its verb handlers as `(*args: str, **kwargs: str)`
+while thumbor declares the concrete arguments its routes capture; and
+`BaseHandler._cleanup` deliberately assigns `None` over its declared types
+to drop references early.
 
 ## Open findings
 
@@ -188,6 +229,14 @@ change, and should be fixed on their own:
 - `RequestParameters.filters` defaults to `[]` but arrives from the URL as a
   `str`, and is consumed with `.split("):")`. The annotation records the
   union rather than papering over it.
+- `ImageApiHandler.validate(body)` and `BaseHandler.validate(path)` share a
+  name by accident and do unrelated things — one checks an upload body, the
+  other a loader path. The subclass shadows the parent in a hierarchy where
+  both are reachable.
+- `PILEngine.gen_image` calls `Filter.get_median_color(self.context.modules)`
+  — an unbound instance method with a `ContextImporter` passed as `self`. It
+  works only because both that class and `Filter` happen to expose
+  `.engine`, which is all the method touches.
 - `MixedStorage.resolve_original_photo_path` delegates to
   `self.file_storage.resolve_original_photo_path`, but no storage shipped
   with thumbor defines that method, and unlike every other method on the

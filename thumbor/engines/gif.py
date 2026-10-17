@@ -75,11 +75,8 @@ class Engine(PILEngine):
 
         result = self.run_gifsicle("--info").decode("utf-8")
         size = GIFSICLE_SIZE_REGEX.search(result)
-        self.image_size = size.groups()[0].split("x")
-        self.image_size[0], self.image_size[1] = (
-            int(self.image_size[0]),
-            int(self.image_size[1]),
-        )
+        width, height = size.groups()[0].split("x")
+        self.image_size = [int(width), int(height)]
 
         count = GIFSICLE_IMAGE_COUNT_REGEX.search(result)
         self.frame_count = int(count.groups()[0])

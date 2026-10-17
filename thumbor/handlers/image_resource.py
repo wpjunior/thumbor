@@ -45,6 +45,9 @@ class ImageResourceHandler(ImageApiHandler):
         else:
             self._error(404, "Image not found at the given URL")
 
+    # tornado types its verb handlers as (*args: str, **kwargs: str);
+    # thumbor declares the concrete arguments its routes capture.
+    # ty: ignore[invalid-method-override]
     async def put(self, file_id):
         file_id = file_id[: self.context.config.MAX_ID_LENGTH]
         # Check if image overwriting is allowed
@@ -57,6 +60,9 @@ class ImageResourceHandler(ImageApiHandler):
             await self.write_file(file_id, self.request.body)
             self.set_status(204)
 
+    # tornado types its verb handlers as (*args: str, **kwargs: str);
+    # thumbor declares the concrete arguments its routes capture.
+    # ty: ignore[invalid-method-override]
     async def delete(self, file_id):
         file_id = file_id[: self.context.config.MAX_ID_LENGTH]
         # Check if image deleting is allowed
@@ -72,8 +78,14 @@ class ImageResourceHandler(ImageApiHandler):
         else:
             self._error(404, "Image not found at the given URL")
 
+    # tornado types its verb handlers as (*args: str, **kwargs: str);
+    # thumbor declares the concrete arguments its routes capture.
+    # ty: ignore[invalid-method-override]
     async def get(self, file_id):
         await self.check_resource(file_id)
 
+    # tornado types its verb handlers as (*args: str, **kwargs: str);
+    # thumbor declares the concrete arguments its routes capture.
+    # ty: ignore[invalid-method-override]
     async def head(self, file_id):
         await self.check_resource(file_id)

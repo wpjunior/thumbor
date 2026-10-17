@@ -12,6 +12,9 @@ from thumbor.utils import logger
 
 
 class BlacklistHandler(ContextHandler):
+    # tornado types its verb handlers as (*args: str, **kwargs: str);
+    # thumbor declares the concrete arguments its routes capture.
+    # ty: ignore[invalid-method-override]
     async def get(self):
         blacklist = await self.get_blacklist_contents()
 
@@ -19,6 +22,9 @@ class BlacklistHandler(ContextHandler):
         self.set_header("Content-Type", "text/plain")
         self.set_status(200)
 
+    # tornado types its verb handlers as (*args: str, **kwargs: str);
+    # thumbor declares the concrete arguments its routes capture.
+    # ty: ignore[invalid-method-override]
     async def put(self):
         blacklist = await self.get_blacklist_contents()
         blacklist += self.request.query + "\n"
