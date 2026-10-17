@@ -16,6 +16,9 @@ from thumbor.utils import logger
 
 
 class Filter(BaseFilter):
+    # Reads self.engine; run() will not execute it without one.
+    uses_engine = True
+
     regex = r"(?:frame\((?P<url>.*?))"
     nine_patch_buffer = None
 

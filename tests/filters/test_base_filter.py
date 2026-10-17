@@ -7,7 +7,10 @@
 # http://www.opensource.org/licenses/mit-license
 # Copyright (c) 2011 globo.com thumbor@googlegroups.com
 
+import ast
+import importlib
 import sys
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -586,3 +589,111 @@ class FilterMethodMetricsTestCase(TestCase):
         instance = _SafeFilter("safe_filter(7)", context)
 
         await instance.run()
+
+
+class EngineRequirementTestCase(TestCase):
+    """Covers the uses_engine contract on BaseFilter.
+
+    A filter whose method reads self.engine must not be executed without
+    one: it used to raise AttributeError on NoneType from inside the
+    filter, which said nothing about which filter or why.
+    """
+
+    @staticmethod
+    def _engine_filter():
+        class _EngineFilter(BaseFilter):
+            uses_engine = True
+
+            @filter_method(BaseFilter.Number)
+            async def engine_filter(
+                self, value
+            ):  # pylint: disable=unused-argument
+                return self.engine.size
+
+        _EngineFilter.__module__ = "thumbor.filters.engine_filter"
+        _EngineFilter.pre_compile()
+        return _EngineFilter
+
+    @gen_test
+    async def test_filter_that_needs_an_engine_refuses_to_run_without_one(
+        self,
+    ):
+        instance = self._engine_filter()("engine_filter(1)")
+        assert instance.engine is None
+
+        with pytest.raises(RuntimeError) as error:
+            await instance.run()
+
+        assert "engine_filter" in str(error.value)
+        assert "cannot run without an engine" in str(error.value)
+
+    @gen_test
+    async def test_filter_that_needs_an_engine_runs_with_one(self):
+        engine = MagicMock()
+        engine.is_multiple.return_value = False
+        engine.size = (3, 4)
+
+        instance = self._engine_filter()("engine_filter(1)")
+        instance.engine = engine
+
+        assert await instance.run() == [(3, 4)]
+
+    @gen_test
+    async def test_filter_that_does_not_need_an_engine_still_runs(self):
+        """uses_engine defaults to False, so this keeps working as before.
+
+        Third-party filters do not declare the flag, which is why the
+        default has to be the permissive one.
+        """
+
+        class _PlainFilter(BaseFilter):
+            @filter_method(BaseFilter.Number)
+            async def plain_filter(self, value):
+                return value
+
+        _PlainFilter.__module__ = "thumbor.filters.plain_filter"
+        _PlainFilter.pre_compile()
+
+        instance = _PlainFilter("plain_filter(5)")
+
+        assert instance.uses_engine is False
+        assert instance.engine is None
+        assert await instance.run() == [5]
+
+    def test_builtin_filters_declare_uses_engine_correctly(self):
+        """Every built-in filter that reads self.engine must declare it.
+
+        Without this, adding a filter that touches the engine and
+        forgetting the flag would reintroduce the AttributeError.
+        """
+
+        filters_dir = Path(thumbor.filters.__file__).parent
+        checked = 0
+
+        for path in sorted(filters_dir.glob("*.py")):
+            if path.name == "__init__.py":
+                continue
+
+            module = importlib.import_module(f"thumbor.filters.{path.stem}")
+            filter_class = getattr(module, "Filter", None)
+
+            if filter_class is None:
+                continue
+
+            tree = ast.parse(path.read_text())
+            reads_engine = any(
+                isinstance(node, ast.Attribute)
+                and node.attr == "engine"
+                and isinstance(node.value, ast.Name)
+                and node.value.id == "self"
+                for node in ast.walk(tree)
+            )
+            checked += 1
+
+            assert filter_class.uses_engine == reads_engine, (
+                f"thumbor.filters.{path.stem} reads self.engine="
+                f"{reads_engine} but declares uses_engine="
+                f"{filter_class.uses_engine}"
+            )
+
+        assert checked > 25

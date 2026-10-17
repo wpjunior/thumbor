@@ -19,6 +19,9 @@ class Filter(BaseFilter):
     Example of blur filter: /filters:convolution(1;2;1;2;4;2;1;2;1,3,true)/
     """
 
+    # Reads self.engine; run() will not execute it without one.
+    uses_engine = True
+
     @filter_method(
         r"-?\d+(?:\.\d*)?(?:;-?\d+(?:\.\d*)?)*",
         BaseFilter.PositiveNonZeroNumber,

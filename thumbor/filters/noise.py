@@ -12,6 +12,9 @@ from thumbor.filters import BaseFilter, filter_method
 
 
 class Filter(BaseFilter):
+    # Reads self.engine; run() will not execute it without one.
+    uses_engine = True
+
     @filter_method(BaseFilter.PositiveNumber, BaseFilter.PositiveNumber)
     async def noise(self, amount, seed=0):
         mode, data = self.engine.image_data_as_rgb()
