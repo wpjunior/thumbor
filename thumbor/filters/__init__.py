@@ -104,10 +104,10 @@ class FiltersFactory:
         if not filter_params:
             return FiltersRunner(filter_instances)
 
-        filter_params = filter_params.split("):")
-        last_idx = len(filter_params) - 1
+        params = filter_params.split("):")
+        last_idx = len(params) - 1
 
-        for i, param in enumerate(filter_params):
+        for i, param in enumerate(params):
             filter_name = param.split("(")[0]
             cls = self.filter_classes_map.get(filter_name, None)
 

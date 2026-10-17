@@ -7,10 +7,15 @@
 # http://www.opensource.org/licenses/mit-license
 # Copyright (c) 2011 globo.com thumbor@googlegroups.com
 
+from __future__ import annotations
+
 import re
-from typing import Any, Pattern
+from typing import TYPE_CHECKING, Any, Pattern, Protocol
 
 from thumbor.utils import logger
+
+if TYPE_CHECKING:
+    from thumbor.context import Context
 
 LEGACY_ALLOWED_SOURCE_REGEX_MARKERS = re.compile(r"[\\^$*+?{}\[\]()|]")
 WARNED_LEGACY_ALLOWED_SOURCE_REGEXES = set()
@@ -92,3 +97,23 @@ class LoaderResult:
         self.error = error
         self.metadata = metadata
         self.extras = extras
+
+
+class LoaderModule(Protocol):
+    """The interface a loader module exposes to the rest of thumbor.
+
+    Loaders are modules rather than classes: the importer resolves the
+    LOADER config value to a module and thumbor calls these functions on
+    it, so the members are declared as static methods.
+
+    `validate` is not implemented by every loader -- `file_loader` has no
+    such restriction to apply -- which is why BaseHandler.validate guards
+    on `hasattr` before calling it. It is declared here because it is part
+    of the interface thumbor asks for; a loader that omits it is tolerated
+    rather than rejected.
+    """
+
+    @staticmethod
+    async def load(context: Context, url: str) -> LoaderResult: ...
+    @staticmethod
+    def validate(context: Context, url: str) -> bool: ...

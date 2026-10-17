@@ -7,14 +7,19 @@
 # http://www.opensource.org/licenses/mit-license
 # Copyright (c) 2011 globo.com thumbor@googlegroups.com
 
-from typing import Any, cast
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from thumbor.handler_lists import HandlerList
 from thumbor.handlers.healthcheck import HealthcheckHandler
 
+if TYPE_CHECKING:
+    from thumbor.context import Context
 
-def get_handlers(context: Any) -> HandlerList:
-    url = cast(str, context.config.HEALTHCHECK_ROUTE)
+
+def get_handlers(context: Context) -> HandlerList:
+    url = context.config.HEALTHCHECK_ROUTE
     return [
         (url, HealthcheckHandler),
     ]
