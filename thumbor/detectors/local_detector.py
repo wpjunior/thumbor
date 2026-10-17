@@ -7,8 +7,10 @@
 # http://www.opensource.org/licenses/mit-license
 # Copyright (c) 2011 globo.com thumbor@googlegroups.com
 
+from __future__ import annotations
+
 from os.path import abspath, dirname, isabs, join
-from typing import Dict
+from typing import Any
 
 import numpy as np
 
@@ -17,7 +19,14 @@ from thumbor.point import FocalPoint
 
 
 class CascadeLoaderDetector(BaseDetector):
-    def load_cascade_file(self, module_path, cascade_file_path):
+    # A cv2.CascadeClassifier, cached on the subclass by load_cascade_file.
+    # Typed as Any because cv2 is an optional dependency, imported inside
+    # the method so thumbor still runs without OpenCV.
+    cascade: Any
+
+    def load_cascade_file(
+        self, module_path: str, cascade_file_path: str
+    ) -> None:
         import cv2  # noqa pylint: disable=import-error,import-outside-toplevel
 
         if not hasattr(self.__class__, "cascade"):
@@ -33,13 +42,13 @@ class CascadeLoaderDetector(BaseDetector):
                 )
             )
 
-    def get_min_size_for(self, size):
+    def get_min_size_for(self, size: tuple[int, int]) -> tuple[int, int]:
         ratio = int(min(size) / 15)
         ratio = max(20, ratio)
 
         return (ratio, ratio)
 
-    def get_features(self):
+    def get_features(self) -> list[tuple[tuple[int, int, int, int], int]]:
         engine = self.context.modules.engine
         img = np.array(
             engine.convert_to_grayscale(update_image=False, alpha=False)
@@ -66,10 +75,10 @@ class CascadeLoaderDetector(BaseDetector):
         top: int,  # pylint: disable=unused-argument
         width: int,  # pylint: disable=unused-argument
         height: int,  # pylint: disable=unused-argument
-    ) -> Dict[str, int]:
+    ) -> dict[str, float]:
         return {}
 
-    async def detect(self):
+    async def detect(self) -> None:
         if not self.verify_cv():
             await self.next()
 
