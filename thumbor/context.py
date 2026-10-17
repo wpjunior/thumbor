@@ -7,11 +7,25 @@
 # http://www.opensource.org/licenses/mit-license
 # Copyright (c) 2011 globo.com thumbor@googlegroups.com
 
+from __future__ import annotations
+
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 from thumbor.filters import FiltersFactory
 from thumbor.metrics.logger_metrics import Metrics
 from thumbor.threadpool import ThreadPool
+
+if TYPE_CHECKING:
+    from types import TracebackType
+
+    from tornado.httputil import HTTPServerRequest
+    from tornado.web import RequestHandler
+
+    from thumbor.config import Config
+    from thumbor.importer import Importer
+    from thumbor.metrics import BaseMetrics
+    from thumbor.point import FocalPoint
 
 
 def _split_http_header(value, delimiter):
@@ -116,11 +130,31 @@ class Context:  # pylint: disable=too-many-instance-attributes
     This class should not be cached in the server.
     """
 
+    # A running server always builds a Context with a server, a config and
+    # an importer; the None defaults below only exist so that tests can
+    # build a bare one. Declaring these as always-present is what lets
+    # `context.config.MAX_WIDTH` and friends type-check across the
+    # codebase, at the cost of the two suppressions in __init__.
+    server: ServerParameters
+    config: Config
+    modules: ContextImporter | None
+    metrics: BaseMetrics
+    request_handler: RequestHandler | None
+    request: RequestParameters
+    app_class: str
+    filters_factory: FiltersFactory
+    thread_pool: ThreadPool
+    headers: dict[str, Any]
+
     def __init__(
-        self, server=None, config=None, importer=None, request_handler=None
-    ):
-        self.server = server
-        self.config = config
+        self,
+        server: ServerParameters | None = None,
+        config: Config | None = None,
+        importer: Importer | None = None,
+        request_handler: RequestHandler | None = None,
+    ) -> None:
+        self.server = server  # ty: ignore[invalid-assignment]
+        self.config = config  # ty: ignore[invalid-assignment]
 
         if importer:
             self.modules = ContextImporter(self, importer)
@@ -153,10 +187,15 @@ class Context:  # pylint: disable=too-many-instance-attributes
         )
         self.headers = {}
 
-    def __enter__(self):
+    def __enter__(self) -> Context:
         return self
 
-    def __exit__(self, exception_type, value, traceback):
+    def __exit__(
+        self,
+        exception_type: type[BaseException] | None,
+        value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
         if self.modules:
             self.modules.cleanup()
 
@@ -164,20 +203,34 @@ class Context:  # pylint: disable=too-many-instance-attributes
 
 
 class ServerParameters:  # pylint: disable=too-many-instance-attributes
+    port: int
+    ip: str
+    config_path: str | None
+    keyfile: str | None
+    log_level: str
+    app_class: str
+    debug: bool
+    # argparse does not coerce --fd, so it arrives as a socket name or a
+    # file descriptor spelled as a string.
+    fd: str | int | None
+    gifsicle_path: str | None
+    use_environment: bool
+    processes: int
+
     def __init__(  # pylint: disable=too-many-positional-arguments
         self,
-        port,
-        ip,  # pylint: disable=invalid-name
-        config_path,
-        keyfile,
-        log_level,
-        app_class,
-        debug=False,
-        fd=None,  # pylint: disable=invalid-name
-        gifsicle_path=None,
-        use_environment=False,
-        processes=1,
-    ):
+        port: int,
+        ip: str,  # pylint: disable=invalid-name
+        config_path: str | None,
+        keyfile: str | None,
+        log_level: str,
+        app_class: str,
+        debug: bool = False,
+        fd: str | int | None = None,  # pylint: disable=invalid-name
+        gifsicle_path: str | None = None,
+        use_environment: bool = False,
+        processes: int = 1,
+    ) -> None:
         self.port = port
         self.ip = (  # Other people may depend on this pylint: disable=invalid-name
             ip
@@ -187,7 +240,7 @@ class ServerParameters:  # pylint: disable=too-many-instance-attributes
         self.log_level = log_level
         self.app_class = app_class
         self.debug = debug
-        self._security_key = None
+        self._security_key: str | bytes | None = None
         self.load_security_key()
         self.fd = (  # Other people may depend on this pylint: disable=invalid-name
             fd
@@ -197,14 +250,14 @@ class ServerParameters:  # pylint: disable=too-many-instance-attributes
         self.processes = processes
 
     @property
-    def security_key(self):
+    def security_key(self) -> str | bytes | None:
         return self._security_key
 
     @security_key.setter
-    def security_key(self, key):
+    def security_key(self, key: str | bytes | None) -> None:
         self._security_key = key
 
-    def load_security_key(self):
+    def load_security_key(self) -> None:
         if not self.keyfile:
             return
 
@@ -252,45 +305,52 @@ class ServerParameters:  # pylint: disable=too-many-instance-attributes
 
 
 class RequestParameters:  # pylint: disable=too-few-public-methods,too-many-instance-attributes,too-many-locals
+    # Only assigned when `trim` is given, but read unconditionally by the
+    # transformer, so they are declared rather than inferred.
+    trim_pos: str
+    trim_tolerance: int
+
     def __init__(  # pylint: disable=too-many-positional-arguments
         self,
-        debug=False,
-        meta=False,
-        trim=None,
-        crop_left=None,
-        crop_top=None,
-        crop_right=None,
-        crop_bottom=None,
-        crop=None,
-        adaptive=False,
-        full=False,
-        fit_in=False,
-        stretch=False,
-        width=0,
-        height=0,
-        horizontal_flip=False,
-        vertical_flip=False,
-        halign="center",
-        valign="middle",
-        filters=None,
-        smart=False,
-        quality=80,
-        image=None,
-        url=None,
-        extension=None,  # pylint: disable=unused-argument
-        buffer=None,  # pylint: disable=unused-argument
-        focal_points=None,
-        unsafe=False,
-        hash=None,  # pylint: disable=unused-argument,redefined-builtin
-        accepts_webp=False,
-        request=None,
-        max_age=None,
-        auto_png_to_jpg=None,
-        accepts_avif=False,
-        accepts_heif=False,
-        accepts_png=False,
-        accepts_jpeg=False,
-    ):
+        debug: bool = False,
+        meta: bool = False,
+        trim: str | None = None,
+        crop_left: int | str | None = None,
+        crop_top: int | str | None = None,
+        crop_right: int | str | None = None,
+        crop_bottom: int | str | None = None,
+        crop: dict[str, int | str | None] | None = None,
+        adaptive: bool = False,
+        full: bool = False,
+        fit_in: bool = False,
+        stretch: bool = False,
+        width: int | str = 0,
+        height: int | str = 0,
+        horizontal_flip: bool = False,
+        vertical_flip: bool = False,
+        halign: str = "center",
+        valign: str = "middle",
+        # Comes off the URL as a string, but defaults to an empty list.
+        filters: str | list[Any] | None = None,
+        smart: bool = False,
+        quality: int = 80,
+        image: str | None = None,
+        url: str | None = None,
+        extension: str | None = None,  # pylint: disable=unused-argument
+        buffer: bytes | None = None,  # pylint: disable=unused-argument
+        focal_points: list[FocalPoint] | None = None,
+        unsafe: bool | str = False,
+        # pylint: disable-next=unused-argument,redefined-builtin
+        hash: str | None = None,
+        accepts_webp: bool = False,
+        request: HTTPServerRequest | None = None,
+        max_age: int | None = None,
+        auto_png_to_jpg: bool | None = None,
+        accepts_avif: bool = False,
+        accepts_heif: bool = False,
+        accepts_png: bool = False,
+        accepts_jpeg: bool = False,
+    ) -> None:
         self.debug = bool(debug)
         self.meta = bool(meta)
         self.trim = trim
@@ -371,7 +431,7 @@ class RequestParameters:  # pylint: disable=too-few-public-methods,too-many-inst
         if request:
             self._set_request_headers(request)
 
-    def _set_request_headers(self, request):
+    def _set_request_headers(self, request: HTTPServerRequest) -> None:
         accept_header = ""
         self.url = request.path
         if request.headers:
@@ -380,7 +440,9 @@ class RequestParameters:  # pylint: disable=too-few-public-methods,too-many-inst
 
         self._set_accepted_image_formats_from_header(accept_header)
 
-    def _set_accepted_image_formats_from_header(self, accept_header):
+    def _set_accepted_image_formats_from_header(
+        self, accept_header: str
+    ) -> None:
         accepted_media_types = _parse_accept_header(accept_header)
         self._accepted_media_types = accepted_media_types
         self._set_accepted_image_formats(
@@ -398,7 +460,9 @@ class RequestParameters:  # pylint: disable=too-few-public-methods,too-many-inst
             )
         )
 
-    def _set_accepted_image_formats(self, accepted_formats):
+    def _set_accepted_image_formats(
+        self, accepted_formats: tuple[bool, bool, bool, bool, bool]
+    ) -> None:
         (
             self.accepts_webp,
             self.accepts_avif,
@@ -408,12 +472,12 @@ class RequestParameters:  # pylint: disable=too-few-public-methods,too-many-inst
         ) = accepted_formats
 
     @staticmethod
-    def int_or_0(value):
+    def int_or_0(value: int | str | None) -> int:
         return 0 if value is None else int(value)
 
 
 class ContextImporter:  # pylint: disable=too-few-public-methods,too-many-instance-attributes
-    def __init__(self, context, importer):
+    def __init__(self, context: Context, importer: Importer) -> None:
         self.context = context
         self.importer = importer
 
@@ -464,6 +528,6 @@ class ContextImporter:  # pylint: disable=too-few-public-methods,too-many-instan
                 importer.compatibility_legacy_result_storage(context)
             )
 
-    def cleanup(self):
+    def cleanup(self) -> None:
         if self.engine:
             self.engine.cleanup()

@@ -8,7 +8,7 @@
 # Copyright (c) 2011 globo.com thumbor@googlegroups.com
 
 import re
-from typing import Dict, Pattern
+from typing import Any, Pattern
 
 from thumbor.utils import logger
 
@@ -51,14 +51,20 @@ class LoaderResult:
     ERROR_TIMEOUT = "timeout"
     ERROR_BAD_REQUEST = "bad_request"
 
+    buffer: bytes | None
+    successful: bool
+    error: str | None
+    metadata: dict[str, Any]
+    extras: dict[str, Any]
+
     def __init__(  # pylint: disable=too-many-positional-arguments
         self,
-        buffer: bytes = None,
+        buffer: bytes | None = None,
         successful: bool = True,
-        error: str = None,
-        metadata: Dict[str, any] = None,
-        extras: Dict[str, any] = None,
-    ):
+        error: str | None = None,
+        metadata: dict[str, Any] | None = None,
+        extras: dict[str, Any] | None = None,
+    ) -> None:
         """
         :param buffer: The media buffer
 

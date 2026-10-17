@@ -7,6 +7,10 @@
 # http://www.opensource.org/licenses/mit-license
 # Copyright (c) 2011 globo.com thumbor@googlegroups.com
 
+from __future__ import annotations
+
+from typing import Any
+
 
 class FocalPoint:
     ALIGNMENT_PERCENTAGES = {
@@ -18,7 +22,14 @@ class FocalPoint:
         "bottom": 1.0,
     }
 
-    def to_dict(self):
+    x: int
+    y: int
+    height: int
+    width: int
+    weight: float
+    origin: str
+
+    def to_dict(self) -> dict[str, Any]:
         return {
             "x": self.x,
             "y": self.y,
@@ -29,7 +40,7 @@ class FocalPoint:
         }
 
     @classmethod
-    def from_dict(cls, values):
+    def from_dict(cls, values: dict[str, Any]) -> FocalPoint:
         return cls(
             x=int(values["x"]),
             y=int(values["y"]),
@@ -41,13 +52,13 @@ class FocalPoint:
 
     def __init__(  # pylint: disable=too-many-positional-arguments
         self,
-        x,  # pylint: disable=invalid-name
-        y,  # pylint: disable=invalid-name
-        height=1,
-        width=1,
-        weight=1.0,
-        origin="alignment",
-    ):
+        x: float,  # pylint: disable=invalid-name
+        y: float,  # pylint: disable=invalid-name
+        height: float = 1,
+        width: float = 1,
+        weight: float = 1.0,
+        origin: str = "alignment",
+    ) -> None:
         self.x = int(x)  # pylint: disable=invalid-name
         self.y = int(y)  # pylint: disable=invalid-name
         self.height = int(height)
@@ -57,8 +68,13 @@ class FocalPoint:
 
     @classmethod
     def from_square(  # pylint: disable=too-many-positional-arguments
-        cls, x, y, width, height, origin="detection"
-    ):  # pylint: disable=invalid-name
+        cls,
+        x: int,  # pylint: disable=invalid-name
+        y: int,  # pylint: disable=invalid-name
+        width: int,
+        height: int,
+        origin: str = "detection",
+    ) -> FocalPoint:
         center_x = x + width // 2
         center_y = y + height // 2
         return cls(
@@ -71,13 +87,15 @@ class FocalPoint:
         )
 
     @classmethod
-    def from_alignment(cls, halign, valign, width, height):
+    def from_alignment(
+        cls, halign: str, valign: str, width: int, height: int
+    ) -> FocalPoint:
         x_coord = width * cls.ALIGNMENT_PERCENTAGES[halign]
         y_coord = height * cls.ALIGNMENT_PERCENTAGES[valign]
 
         return cls(x_coord, y_coord)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (
             f"FocalPoint(x: {self.x}, y: {self.y}, width: {self.width}, "
             f"height: {self.height}, weight: {self.weight:.0f}, origin: {self.origin})"
