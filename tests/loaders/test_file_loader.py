@@ -8,6 +8,7 @@
 # Copyright (c) 2011 globo.com thumbor@googlegroups.com
 
 from asyncio import to_thread
+from datetime import datetime, timedelta, timezone
 from os import makedirs
 from os.path import abspath, dirname, join
 from pathlib import Path
@@ -110,3 +111,27 @@ class FileLoaderTestCase(TestCase):
         with open(join(STORAGE_PATH, "image2%20.jpg"), "rb") as img:
             assert result.buffer == img.read()
             assert result.successful
+
+
+class FileLoaderMetadataTestCase(TestCase):
+    def get_config(self):
+        return Config(FILE_LOADER_ROOT_PATH=STORAGE_PATH)
+
+    @gen_test
+    async def test_updated_at_is_timezone_aware(self):
+        """updated_at used to come from the deprecated utcfromtimestamp.
+
+        It was a naive datetime standing for UTC, which is the trap the
+        deprecation is about: comparing it with an aware one raises.
+        """
+
+        result = await load(self.context, "image.jpg")
+
+        assert result.successful is True
+
+        updated_at = result.metadata["updated_at"]
+
+        assert updated_at.tzinfo is not None
+        assert updated_at.utcoffset() == timedelta(0)
+        # The point of being aware: this comparison used to raise.
+        assert updated_at <= datetime.now(timezone.utc)

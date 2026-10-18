@@ -7,7 +7,7 @@
 # http://www.opensource.org/licenses/mit-license
 # Copyright (c) 2011 globo.com thumbor@googlegroups.com
 
-from datetime import datetime
+from datetime import datetime, timezone
 from os import fstat
 from os.path import abspath, commonpath, exists, isfile, join
 from urllib.parse import unquote
@@ -58,7 +58,9 @@ async def load(context, path):
 
             result.metadata.update(
                 size=stats.st_size,
-                updated_at=datetime.utcfromtimestamp(stats.st_mtime),
+                updated_at=datetime.fromtimestamp(
+                    stats.st_mtime, timezone.utc
+                ),
             )
     else:
         result.error = LoaderResult.ERROR_NOT_FOUND
