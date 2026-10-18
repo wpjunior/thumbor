@@ -28,21 +28,15 @@ the package itself is clean.
 $ make typecheck-ci
 ```
 
-This one does fail, but only on the rules that are already at zero. The
-rules thumbor still owes work on are set to `warn` in `[tool.ty.rules]`, and
-the command runs with `--exit-zero-on-warning`, so the existing backlog does
-not block anything while a newly introduced problem does.
+`thumbor/` reports nothing, so this fails on anything at all. There is no
+warn list any more: `[tool.ty.rules]` holds only `deprecated = "error"`,
+because ty reports that one as a warning by default and leaving it at the
+default would let a new `datetime.utcnow()` through.
 
-That is the mechanism for finishing a rule off: drive it to zero, delete its
-line from `[tool.ty.rules]`, and from then on it is an error that the gate
-catches. Only three rules are still warnings, and all three are the open
-findings below. Everything else — `invalid-argument-type`,
-`invalid-assignment`, `unsupported-operator`, `no-matching-overload`,
-`invalid-return-type`, `unresolved-import`, `not-subscriptable`,
-`not-iterable`, `unused-type-ignore-comment`, `invalid-method-override`,
-`call-non-callable`, `missing-argument`, `invalid-parameter-default`,
-`invalid-type-form`, `redundant-condition`,
-`too-many-positional-arguments` — is an error the gate enforces.
+Getting here took the backlog from 419 diagnostics to zero over thirteen
+steps, promoting rules out of the warn list as each reached zero. Verified
+that a deprecated call, a wrong return type and an unknown attribute each
+fail the command.
 
 Wiring it into CI and pre-commit is the remaining step and has not been
 done; the workflow files are untouched.
@@ -52,7 +46,8 @@ done; the workflow files are untouched.
 The count started at **419** (ty 0.0.89, `thumbor/` only), was **375**
 after phase 1, **369** after phase 2, **323** after phase 3, **316** after
 phase 4, **155** after phase 5, **67** after phase 6, **37** after phase 7,
-**21** after phase 8 and is **5** after phase 9. The number moves slowly on
+**21** after phase 8 , **5** after phase 9 and **zero** after
+phase 13. The number moves slowly on
 purpose: annotating a module often *reveals* errors that were previously
 hidden behind `Unknown`, so a phase can fix real problems while the total
 barely moves — or rises.
@@ -227,6 +222,32 @@ parameters in phase 1 although `CascadeLoaderDetector.detect` passes it
 `ImagingHandler` always passes the tornado request and
 `_set_request_headers` sets the url from its path.
 
+**Phase 13 (done)** — `BaseHandler` awaited `result_storage.last_updated()`,
+which is a plain `def`. Reachable only through a result storage on the
+contract that predates `ResultStorageResult`, whose `get()` returns raw
+bytes: that branch raised `TypeError: 'datetime.datetime' object can't be
+awaited`, which the surrounding `except NotImplementedError` did not catch.
+`_storage_last_updated` now calls it without `await`, returns None when no
+result storage is configured, and discards the `True` that the bundled file
+storage returns on both of its failure paths.
+`tests/fixtures/bytes_result_storage.py` is a storage on that old contract,
+so the branch is covered.
+
+That was the last diagnostic, which is why the warn list is gone.
+
+**Phase 12 (done)** — replaced the deprecated `datetime.utcnow()` and
+`utcfromtimestamp()` with timezone-aware equivalents. The two `Expires`
+headers are unchanged, since tornado converts an aware datetime to UTC
+before formatting, and the `max_age` tests now assert the header's value
+rather than its mere presence. `file_loader`'s `updated_at` metadata is now
+aware, which is a visible change for a plugin comparing it against a naive
+datetime. It also took the unit suite from 534 warnings to 25, and the
+integration suite from 1066 to none.
+
+**Phase 11 (done)** — narrowed `config_key` once at the top of
+`Importer.import_item`, replacing three suppressions spread through its
+body.
+
 **Phase 10 (done)** — replaced `Any` with real types wherever it was
 standing in for something knowable. 129 occurrences across the package
 became 82, and the 37 config options that were `Any` became 2.
@@ -347,13 +368,10 @@ to drop references early.
 
 ## Open findings
 
-Things the checker surfaced that are real but out of scope for a typing
-change, and should be fixed on their own:
+Things the checker surfaced that are real. The two that needed a behaviour
+change were fixed in phases 12 and 13; what is left is recorded for someone
+with the domain knowledge to judge:
 
-- `datetime.utcnow()` and `datetime.utcfromtimestamp()` are deprecated, in
-  `handlers/__init__.py`, `handlers/image_resource.py` and
-  `loaders/file_loader.py`. Fixing them changes behaviour (naive to
-  timezone-aware datetimes), so it needs its own change and tests.
 - `RequestParameters.filters` defaults to `[]` but arrives from the URL as a
   `str`, and is consumed with `.split("):")`. The annotation records the
   union rather than papering over it.
@@ -375,15 +393,6 @@ change, and should be fixed on their own:
   class it does not call `_init_file_storage()` first. It raises
   `AttributeError` whichever way it is reached. Left as is because it is
   public API; the diagnostic is suppressed where it occurs.
-- `result_storages/file_storage.last_updated()` returns `True` on both of
-  its failure paths and a `datetime` otherwise, and its only caller does
-  `result_last_modified.strftime(...)` — which would raise on the `True`.
-  The annotation records `datetime | bool` rather than hiding it. The same
-  caller also does `await` on `last_updated()`, which is a plain `def`, so
-  a result storage returning a real value there raises `TypeError` that the
-  surrounding `except NotImplementedError` does not catch. Unreachable with
-  the bundled file storage, whose `get()` returns a `ResultStorageResult`
-  and so takes the other branch.
 - `BaseEngine.read(self, extension, quality)` takes no defaults, but every
   subclass declares `read(self, extension=None, quality=None)` and every
   caller invokes `read()` with no arguments. The base signature is stricter

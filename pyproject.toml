@@ -136,9 +136,8 @@ target-version = ['py310']
 include = '\.pyi?$'
 
 # Static type checking (see docs/typing.md).
-# `make typecheck` reports everything and never fails. `make typecheck-ci`
-# fails only on the rules listed as errors below, which are the ones already
-# at zero.
+# The package is clean, so every rule is an error and `make typecheck-ci`
+# fails on any of them. There is no warn list any more.
 [tool.ty.environment]
 python-version = "3.10"
 
@@ -150,19 +149,11 @@ include = ["thumbor"]
 [tool.ty.terminal]
 output-format = "concise"
 
-# The rules thumbor still owes work on are warnings, so `make typecheck-ci`
-# can fail on everything else. That makes the checker a gate against new
-# problems without first demanding the backlog be cleared. Moving a rule out
-# of this list is how a phase is finished: drive it to zero, then delete the
-# line and it becomes an error from then on.
+# ty reports these as warnings by default. The package is clean of them, so
+# raising them to errors is what keeps `make typecheck-ci` from letting one
+# back in.
 [tool.ty.rules]
-# All that is left. The first two are the deprecated datetime.utcnow calls
-# and the storage whose last_updated is awaited although it is a plain def;
-# both need a behaviour change, so they are tracked in docs/typing.md under
-# open findings rather than annotated away.
-deprecated = "warn"
-invalid-await = "warn"
-unresolved-attribute = "warn"
+deprecated = "error"
 
 [tool.cibuildwheel]
 build = "cp31[012345]-*"

@@ -802,6 +802,29 @@ class BaseHandler(tornado.web.RequestHandler):
 
         return results, content_type
 
+    def _storage_last_updated(self) -> datetime.datetime | None:
+        """The result storage's last_updated, when it offers a usable one.
+
+        Only reached for a result storage on the old contract, whose get()
+        returns something other than a ResultStorageResult. last_updated
+        is a plain def -- awaiting it raised TypeError, which the
+        NotImplementedError handler around the caller does not catch --
+        and the bundled file storage returns True rather than a datetime on
+        both of its failure paths.
+        """
+
+        result_storage = self.context.modules.result_storage
+
+        if result_storage is None:
+            return None
+
+        last_updated = result_storage.last_updated()
+
+        if not isinstance(last_updated, datetime.datetime):
+            return None
+
+        return last_updated
+
     async def _process_result_from_storage(self, result):
         if self.context.config.SEND_IF_MODIFIED_LAST_MODIFIED_HEADERS:
             # Handle If-Modified-Since & Last-Modified header
@@ -809,9 +832,7 @@ class BaseHandler(tornado.web.RequestHandler):
                 if isinstance(result, ResultStorageResult):
                     result_last_modified = result.last_modified
                 else:
-                    result_last_modified = await (
-                        self.context.modules.result_storage.last_updated()
-                    )
+                    result_last_modified = self._storage_last_updated()
 
                 if result_last_modified:
                     if "If-Modified-Since" in self.request.headers:
