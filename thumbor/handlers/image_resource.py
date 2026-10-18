@@ -44,7 +44,7 @@ class ImageResourceHandler(ImageApiHandler):
             )
             self.set_header(
                 "Expires",
-                datetime.datetime.utcnow()
+                datetime.datetime.now(datetime.timezone.utc)
                 + datetime.timedelta(seconds=max_age),
             )
         self.write(body)

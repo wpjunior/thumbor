@@ -7,11 +7,34 @@
 # http://www.opensource.org/licenses/mit-license
 # Copyright (c) 2011 globo.com thumbor@googlegroups.com
 
+from datetime import datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
+
 from tornado.testing import gen_test
 
 from tests.base import TestCase
 from thumbor.config import Config
 from thumbor.importer import Importer
+
+
+def assert_expires_in(headers, seconds):
+    """Checks the Expires header really lands `seconds` from now.
+
+    The value used to be built from datetime.utcnow(), which is naive;
+    tornado converts an aware datetime to UTC before formatting, so the
+    header is unchanged -- this asserts that rather than assuming it.
+    """
+
+    expires = parsedate_to_datetime(headers["Expires"])
+
+    if expires.tzinfo is None:
+        expires = expires.replace(tzinfo=timezone.utc)
+
+    expected = datetime.now(timezone.utc) + timedelta(seconds=seconds)
+
+    assert (
+        abs((expires - expected).total_seconds()) < 60
+    ), f"Expires is {expires}, expected around {expected}"
 
 
 class BaseMaxAgeFilterTestCase(TestCase):
@@ -35,7 +58,7 @@ class MaxAgeFilterTestCase(BaseMaxAgeFilterTestCase):
         )
         assert response.code == 200
         assert response.headers["Cache-Control"] == "max-age=2,public"
-        assert "Expires" in response.headers
+        assert_expires_in(response.headers, 2)
 
     @gen_test
     async def test_max_age_url(self):
@@ -44,7 +67,7 @@ class MaxAgeFilterTestCase(BaseMaxAgeFilterTestCase):
         )
         assert response.code == 200
         assert response.headers["Cache-Control"] == "max-age=30,public"
-        assert "Expires" in response.headers
+        assert_expires_in(response.headers, 30)
 
 
 class MaxAgeDetectorFilterTestCase(BaseMaxAgeFilterTestCase):

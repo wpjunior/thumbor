@@ -933,7 +933,7 @@ class BaseHandler(tornado.web.RequestHandler):
             )
             self.set_header(
                 "Expires",
-                datetime.datetime.utcnow()
+                datetime.datetime.now(datetime.timezone.utc)
                 + datetime.timedelta(seconds=max_age),
             )
 
