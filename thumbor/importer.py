@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from importlib import import_module
 from types import ModuleType
-from typing import TYPE_CHECKING, Any, Callable, Protocol, Sequence
+from typing import TYPE_CHECKING, Any, Callable, Protocol, Sequence, cast
 
 from thumbor.utils import logger
 
@@ -196,17 +196,17 @@ class Importer:  # pylint: disable=too-many-instance-attributes
         validate_fn: Callable[[Any], None] | None = None,
     ) -> None:
         # Every caller passes config_key; the None default is vestigial,
-        # and the method cannot do anything useful without it.
+        # and the method cannot do anything without it.
+        key = cast(str, config_key)
+
         if item_value is None:
-            conf_value = getattr(
-                self.config, config_key  # ty: ignore[invalid-argument-type]
-            )
+            conf_value = getattr(self.config, key)
         else:
             conf_value = item_value
 
         if is_multiple:
             self.load_multiple_item(
-                config_key,  # ty: ignore[invalid-argument-type]
+                key,
                 conf_value,
                 class_name,
                 ignore_errors,
@@ -217,11 +217,7 @@ class Importer:  # pylint: disable=too-many-instance-attributes
                 module = self.import_class(f"{conf_value}.{class_name}")
             else:
                 module = self.import_class(conf_value, get_module=True)
-            setattr(
-                self,
-                config_key.lower(),  # ty: ignore[unresolved-attribute]
-                module,
-            )
+            setattr(self, key.lower(), module)
 
     def load_multiple_item(  # pylint: disable=too-many-positional-arguments
         self,
