@@ -168,3 +168,48 @@ class ImageOperationsWithLastModifiedTestCase(BaseImagingTestCase):
 
         assert response.code == 200
         assert "Last-Modified" in response.headers
+
+
+class ImageOperationsWithLegacyResultStorageTestCase(BaseImagingTestCase):
+    """A result storage on the contract that predates ResultStorageResult.
+
+    Its get() returns raw bytes, which sends BaseHandler down the branch
+    that reads last_updated() off the storage itself. That branch used to
+    await a plain def, raising a TypeError the surrounding
+    `except NotImplementedError` did not catch.
+    """
+
+    def get_context(self):
+        cfg = Config(SECURITY_KEY="ACME-SEC")
+        cfg.LOADER = "thumbor.loaders.file_loader"
+        cfg.FILE_LOADER_ROOT_PATH = self.loader_path
+        cfg.RESULT_STORAGE = "tests.fixtures.bytes_result_storage"
+        cfg.SEND_IF_MODIFIED_LAST_MODIFIED_HEADERS = True
+        # Without this an /unsafe/ URL skips the result storage entirely.
+        cfg.RESULT_STORAGE_STORES_UNSAFE = True
+
+        importer = Importer(cfg)
+        importer.import_modules()
+        server = ServerParameters(
+            8889, "localhost", "thumbor.conf", None, "info", None
+        )
+        server.security_key = "ACME-SEC"
+        return Context(server, cfg, importer)
+
+    @gen_test
+    async def test_serves_image_and_sets_last_modified(self):
+        response = await self.async_fetch("/unsafe/image.jpg")
+
+        assert response.code == 200
+        assert response.headers["Last-Modified"] == (
+            "Wed, 01 Jan 2020 00:00:00 GMT"
+        )
+
+    @gen_test
+    async def test_returns_304_when_not_modified_since(self):
+        response = await self.async_fetch(
+            "/unsafe/image.jpg",
+            headers={"If-Modified-Since": "Fri, 01 Jan 2021 00:00:00 GMT"},
+        )
+
+        assert response.code == 304
